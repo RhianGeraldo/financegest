@@ -27,7 +27,7 @@ export const Route = createFileRoute("/_authenticated/relatorios")({
 });
 
 function RelatoriosPage() {
-  const { selectedCompanyId, companies } = useAuth();
+  const { selectedCompanyId, companies, loading } = useAuth();
   const [headerNode, setHeaderNode] = useState<HTMLElement | null>(null);
 
   useEffect(() => {
@@ -54,6 +54,7 @@ function RelatoriosPage() {
       if (error) throw error;
       return data ?? [];
     },
+    enabled: !loading,
   });
 
   if (isPending) {

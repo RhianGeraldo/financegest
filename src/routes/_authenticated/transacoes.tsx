@@ -29,7 +29,7 @@ export const Route = createFileRoute("/_authenticated/transacoes")({
 });
 
 function TransacoesPage() {
-  const { selectedCompanyId, companies, canWrite } = useAuth();
+  const { selectedCompanyId, companies, canWrite, loading } = useAuth();
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
   const [filterCompany, setFilterCompany] = useState("all");
@@ -59,6 +59,7 @@ function TransacoesPage() {
       if (error) throw error;
       return data ?? [];
     },
+    enabled: !loading,
   });
 
   const filtered = (txs ?? []).filter((t) => {

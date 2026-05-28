@@ -37,7 +37,7 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
 });
 
 function DashboardPage() {
-  const { selectedCompanyId, companies } = useAuth();
+  const { selectedCompanyId, companies, loading } = useAuth();
 
   const { data: tx, isPending: txLoading } = useQuery({
     queryKey: ["tx", selectedCompanyId],
@@ -52,6 +52,7 @@ function DashboardPage() {
       if (error) throw error;
       return data ?? [];
     },
+    enabled: !loading,
   });
 
   const { data: banks, isPending: banksLoading } = useQuery({
@@ -63,6 +64,7 @@ function DashboardPage() {
       if (error) throw error;
       return data ?? [];
     },
+    enabled: !loading,
   });
 
   const now = new Date();
