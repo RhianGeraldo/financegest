@@ -1,10 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/lib/auth";
+import { useAuth, applyCompanyFilter } from "@/lib/auth";
 import { formatBRL, statusLabel, formatDate } from "@/lib/format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Link } from "@tanstack/react-router";
+import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import {
   ArrowDownRight,
   ArrowUpRight,
@@ -12,6 +15,8 @@ import {
   TrendingUp,
   Clock,
   CheckCircle2,
+  AlertTriangle,
+  Plus,
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -34,14 +39,15 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
 function DashboardPage() {
   const { selectedCompanyId, companies } = useAuth();
 
-  const companyFilter = (q: ReturnType<typeof supabase.from>) =>
-    selectedCompanyId === "all" ? q : q.eq("company_id", selectedCompanyId);
-
   const { data: tx } = useQuery({
     queryKey: ["tx", selectedCompanyId],
     queryFn: async () => {
-      let q = supabase.from("transactions").select("*").order("due_date", { ascending: false }).limit(500);
-      if (selectedCompanyId !== "all") q = q.eq("company_id", selectedCompanyId);
+      let q = supabase
+        .from("transactions")
+        .select("id, amount, type, status, due_date, paid_date, category_id, description")
+        .order("due_date", { ascending: false })
+        .limit(500);
+      q = applyCompanyFilter(q, selectedCompanyId, companies);
       const { data, error } = await q;
       if (error) throw error;
       return data ?? [];
@@ -51,8 +57,8 @@ function DashboardPage() {
   const { data: banks } = useQuery({
     queryKey: ["banks", selectedCompanyId],
     queryFn: async () => {
-      let q = supabase.from("bank_accounts").select("*");
-      if (selectedCompanyId !== "all") q = q.eq("company_id", selectedCompanyId);
+      let q = supabase.from("bank_accounts").select("initial_balance");
+      q = applyCompanyFilter(q, selectedCompanyId, companies);
       const { data, error } = await q;
       if (error) throw error;
       return data ?? [];
@@ -106,16 +112,27 @@ function DashboardPage() {
     { label: "A receber", value: formatBRL(aReceber), icon: CheckCircle2, accent: "text-primary" },
   ];
 
+  const [headerNode, setHeaderNode] = useState<HTMLElement | null>(null);
+
+  useEffect(() => {
+    setHeaderNode(document.getElementById("page-header"));
+  }, []);
+
   return (
     <div className="space-y-6 max-w-[1400px] mx-auto">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
-        <p className="text-sm text-muted-foreground">
-          {selectedCompanyId === "all"
-            ? `Visão consolidada — ${companies.length} empresa(s)`
-            : companies.find((c) => c.id === selectedCompanyId)?.name ?? ""}
-        </p>
-      </div>
+      {headerNode && createPortal(
+        <div className="flex flex-col">
+          <h1 className="text-xl font-semibold tracking-tight leading-none">Dashboard</h1>
+          <p className="text-xs text-muted-foreground mt-1">
+            {selectedCompanyId === "all_clinica"
+              ? "Consolidado Comercial"
+              : selectedCompanyId === "all_pessoal"
+              ? "Consolidado Pessoal"
+              : companies.find((c) => c.id === selectedCompanyId)?.name ?? ""}
+          </p>
+        </div>,
+        headerNode
+      )}
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         {stats.map((s) => (

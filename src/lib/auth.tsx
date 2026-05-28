@@ -26,6 +26,18 @@ export interface AuthState {
   signOut: () => Promise<void>;
 }
 
+export function applyCompanyFilter(q: any, selectedCompanyId: string, companies: Company[]) {
+  if (selectedCompanyId === "all_clinica") {
+    const ids = companies.filter((c) => c.kind === "clinica").map((c) => c.id);
+    return ids.length > 0 ? q.in("company_id", ids) : q.eq("company_id", "00000000-0000-0000-0000-000000000000");
+  }
+  if (selectedCompanyId === "all_pessoal") {
+    const ids = companies.filter((c) => c.kind === "pessoal").map((c) => c.id);
+    return ids.length > 0 ? q.in("company_id", ids) : q.eq("company_id", "00000000-0000-0000-0000-000000000000");
+  }
+  return q.eq("company_id", selectedCompanyId);
+}
+
 const Ctx = createContext<AuthState | null>(null);
 
 const SELECTED_KEY = "caixa:selected_company";
@@ -36,8 +48,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [roles, setRoles] = useState<AppRole[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [selectedCompanyId, setSelectedCompanyIdState] = useState<string>(() => {
-    if (typeof window === "undefined") return "all";
-    return localStorage.getItem(SELECTED_KEY) || "all";
+    if (typeof window === "undefined") return "all_clinica";
+    const saved = localStorage.getItem(SELECTED_KEY);
+    if (!saved || saved === "all") return "all_clinica";
+    return saved;
   });
 
   const setSelectedCompanyId = (id: string) => {
@@ -46,16 +60,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   async function loadUserScope(userId: string) {
-    const [rolesRes, compRes] = await Promise.all([
-      supabase.from("user_roles").select("role").eq("user_id", userId),
-      supabase
-        .from("companies")
-        .select("id, name, kind, color")
-        .eq("active", true)
-        .order("name"),
-    ]);
-    setRoles((rolesRes.data?.map((r) => r.role as AppRole)) ?? []);
-    setCompanies((compRes.data as Company[]) ?? []);
+    try {
+      const fetchPromise = Promise.all([
+        supabase.from("user_roles").select("role").eq("user_id", userId),
+        supabase
+          .from("companies")
+          .select("id, name, kind, color")
+          .eq("active", true)
+          .order("name"),
+      ]);
+      
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error("Supabase timeout! O banco demorou mais de 5s para responder.")), 5000)
+      );
+
+      const [rolesRes, compRes] = await Promise.race([fetchPromise, timeoutPromise]) as any;
+
+      setRoles((rolesRes.data?.map((r: any) => r.role as AppRole)) ?? []);
+      setCompanies((compRes.data as Company[]) ?? []);
+    } catch (e: any) {
+      console.error("Erro fatal no loadUserScope:", e.message || e);
+    }
   }
 
   async function refresh() {
@@ -74,14 +99,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (_event, sess) => {
-      setSession(sess);
-      if (sess?.user) {
-        await loadUserScope(sess.user.id);
-      } else {
-        setRoles([]);
-        setCompanies([]);
+      try {
+        setSession(sess);
+        if (sess?.user) {
+          await loadUserScope(sess.user.id);
+        } else {
+          setRoles([]);
+          setCompanies([]);
+        }
+      } catch (err) {
+        console.error("Erro ao carregar escopo de usuário:", err);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     });
     return () => subscription.unsubscribe();
   }, []);
@@ -102,7 +132,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     refresh,
     signOut: async () => {
       await supabase.auth.signOut();
-      setSelectedCompanyId("all");
+      setSelectedCompanyId("all_clinica");
     },
   };
 

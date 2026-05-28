@@ -31,6 +31,7 @@ function AuthLayout() {
         <div className="flex-1 flex flex-col min-w-0">
           <header className="h-14 flex items-center gap-3 border-b px-4 sticky top-0 bg-background/80 backdrop-blur z-10">
             <SidebarTrigger />
+            <div id="page-header" className="flex-1 flex items-center justify-between" />
           </header>
           <main className="flex-1 p-6">
             <Outlet />

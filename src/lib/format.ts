@@ -48,3 +48,17 @@ export function statusLabel(status: string, dueDate: string): "pago" | "atrasado
   if (status === "pago") return "pago";
   return isOverdue(dueDate, status) ? "atrasado" : "pendente";
 }
+
+export function addMonths(dateString: string, monthsToAdd: number): string {
+  if (monthsToAdd === 0) return dateString;
+  const [y, m, d] = dateString.split("-").map(Number);
+  let date = new Date(y, m - 1 + monthsToAdd, d);
+  // Correção de fim de mês: ex: 31 de Janeiro + 1 mês = Date() vira Março.
+  // Se o dia não for o mesmo que pedimos, significa que estourou o mês alvo.
+  // Então voltamos para o último dia do mês alvo.
+  if (date.getDate() !== d) {
+    date = new Date(y, m - 1 + monthsToAdd + 1, 0);
+  }
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}

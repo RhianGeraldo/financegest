@@ -15,13 +15,12 @@ import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedUsuariosRouteImport } from './routes/_authenticated/usuarios'
 import { Route as AuthenticatedTransacoesRouteImport } from './routes/_authenticated/transacoes'
+import { Route as AuthenticatedRelatoriosRouteImport } from './routes/_authenticated/relatorios'
 import { Route as AuthenticatedEmpresasRouteImport } from './routes/_authenticated/empresas'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedContasRouteImport } from './routes/_authenticated/contas'
 import { Route as AuthenticatedCentrosCustoRouteImport } from './routes/_authenticated/centros-custo'
 import { Route as AuthenticatedCategoriasRouteImport } from './routes/_authenticated/categorias'
-import { Route as AuthenticatedAReceberRouteImport } from './routes/_authenticated/a-receber'
-import { Route as AuthenticatedAPagarRouteImport } from './routes/_authenticated/a-pagar'
 
 const SignupRoute = SignupRouteImport.update({
   id: '/signup',
@@ -52,6 +51,11 @@ const AuthenticatedTransacoesRoute = AuthenticatedTransacoesRouteImport.update({
   path: '/transacoes',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedRelatoriosRoute = AuthenticatedRelatoriosRouteImport.update({
+  id: '/relatorios',
+  path: '/relatorios',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedEmpresasRoute = AuthenticatedEmpresasRouteImport.update({
   id: '/empresas',
   path: '/empresas',
@@ -78,28 +82,17 @@ const AuthenticatedCategoriasRoute = AuthenticatedCategoriasRouteImport.update({
   path: '/categorias',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
-const AuthenticatedAReceberRoute = AuthenticatedAReceberRouteImport.update({
-  id: '/a-receber',
-  path: '/a-receber',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedAPagarRoute = AuthenticatedAPagarRouteImport.update({
-  id: '/a-pagar',
-  path: '/a-pagar',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
-  '/a-pagar': typeof AuthenticatedAPagarRoute
-  '/a-receber': typeof AuthenticatedAReceberRoute
   '/categorias': typeof AuthenticatedCategoriasRoute
   '/centros-custo': typeof AuthenticatedCentrosCustoRoute
   '/contas': typeof AuthenticatedContasRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/empresas': typeof AuthenticatedEmpresasRoute
+  '/relatorios': typeof AuthenticatedRelatoriosRoute
   '/transacoes': typeof AuthenticatedTransacoesRoute
   '/usuarios': typeof AuthenticatedUsuariosRoute
 }
@@ -107,13 +100,12 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
-  '/a-pagar': typeof AuthenticatedAPagarRoute
-  '/a-receber': typeof AuthenticatedAReceberRoute
   '/categorias': typeof AuthenticatedCategoriasRoute
   '/centros-custo': typeof AuthenticatedCentrosCustoRoute
   '/contas': typeof AuthenticatedContasRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/empresas': typeof AuthenticatedEmpresasRoute
+  '/relatorios': typeof AuthenticatedRelatoriosRoute
   '/transacoes': typeof AuthenticatedTransacoesRoute
   '/usuarios': typeof AuthenticatedUsuariosRoute
 }
@@ -123,13 +115,12 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
-  '/_authenticated/a-pagar': typeof AuthenticatedAPagarRoute
-  '/_authenticated/a-receber': typeof AuthenticatedAReceberRoute
   '/_authenticated/categorias': typeof AuthenticatedCategoriasRoute
   '/_authenticated/centros-custo': typeof AuthenticatedCentrosCustoRoute
   '/_authenticated/contas': typeof AuthenticatedContasRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/empresas': typeof AuthenticatedEmpresasRoute
+  '/_authenticated/relatorios': typeof AuthenticatedRelatoriosRoute
   '/_authenticated/transacoes': typeof AuthenticatedTransacoesRoute
   '/_authenticated/usuarios': typeof AuthenticatedUsuariosRoute
 }
@@ -139,13 +130,12 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/signup'
-    | '/a-pagar'
-    | '/a-receber'
     | '/categorias'
     | '/centros-custo'
     | '/contas'
     | '/dashboard'
     | '/empresas'
+    | '/relatorios'
     | '/transacoes'
     | '/usuarios'
   fileRoutesByTo: FileRoutesByTo
@@ -153,13 +143,12 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/signup'
-    | '/a-pagar'
-    | '/a-receber'
     | '/categorias'
     | '/centros-custo'
     | '/contas'
     | '/dashboard'
     | '/empresas'
+    | '/relatorios'
     | '/transacoes'
     | '/usuarios'
   id:
@@ -168,13 +157,12 @@ export interface FileRouteTypes {
     | '/_authenticated'
     | '/login'
     | '/signup'
-    | '/_authenticated/a-pagar'
-    | '/_authenticated/a-receber'
     | '/_authenticated/categorias'
     | '/_authenticated/centros-custo'
     | '/_authenticated/contas'
     | '/_authenticated/dashboard'
     | '/_authenticated/empresas'
+    | '/_authenticated/relatorios'
     | '/_authenticated/transacoes'
     | '/_authenticated/usuarios'
   fileRoutesById: FileRoutesById
@@ -230,6 +218,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedTransacoesRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/relatorios': {
+      id: '/_authenticated/relatorios'
+      path: '/relatorios'
+      fullPath: '/relatorios'
+      preLoaderRoute: typeof AuthenticatedRelatoriosRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/empresas': {
       id: '/_authenticated/empresas'
       path: '/empresas'
@@ -265,43 +260,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedCategoriasRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/a-receber': {
-      id: '/_authenticated/a-receber'
-      path: '/a-receber'
-      fullPath: '/a-receber'
-      preLoaderRoute: typeof AuthenticatedAReceberRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/a-pagar': {
-      id: '/_authenticated/a-pagar'
-      path: '/a-pagar'
-      fullPath: '/a-pagar'
-      preLoaderRoute: typeof AuthenticatedAPagarRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
   }
 }
 
 interface AuthenticatedRouteChildren {
-  AuthenticatedAPagarRoute: typeof AuthenticatedAPagarRoute
-  AuthenticatedAReceberRoute: typeof AuthenticatedAReceberRoute
   AuthenticatedCategoriasRoute: typeof AuthenticatedCategoriasRoute
   AuthenticatedCentrosCustoRoute: typeof AuthenticatedCentrosCustoRoute
   AuthenticatedContasRoute: typeof AuthenticatedContasRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedEmpresasRoute: typeof AuthenticatedEmpresasRoute
+  AuthenticatedRelatoriosRoute: typeof AuthenticatedRelatoriosRoute
   AuthenticatedTransacoesRoute: typeof AuthenticatedTransacoesRoute
   AuthenticatedUsuariosRoute: typeof AuthenticatedUsuariosRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
-  AuthenticatedAPagarRoute: AuthenticatedAPagarRoute,
-  AuthenticatedAReceberRoute: AuthenticatedAReceberRoute,
   AuthenticatedCategoriasRoute: AuthenticatedCategoriasRoute,
   AuthenticatedCentrosCustoRoute: AuthenticatedCentrosCustoRoute,
   AuthenticatedContasRoute: AuthenticatedContasRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedEmpresasRoute: AuthenticatedEmpresasRoute,
+  AuthenticatedRelatoriosRoute: AuthenticatedRelatoriosRoute,
   AuthenticatedTransacoesRoute: AuthenticatedTransacoesRoute,
   AuthenticatedUsuariosRoute: AuthenticatedUsuariosRoute,
 }

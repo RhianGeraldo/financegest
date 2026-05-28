@@ -29,20 +29,27 @@ function LoginPage() {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
+    console.log("LoginPage state:", { loading, hasSession: !!session });
     if (!loading && session) nav({ to: "/dashboard", replace: true });
   }, [loading, session, nav]);
 
   const form = useForm<Form>({ resolver: zodResolver(schema), defaultValues: { email: "", password: "" } });
 
   const onSubmit = async (data: Form) => {
-    setSubmitting(true);
-    const { error } = await supabase.auth.signInWithPassword(data);
-    setSubmitting(false);
-    if (error) {
-      toast.error("Falha ao entrar", { description: error.message });
-      return;
+    try {
+      setSubmitting(true);
+      const { error, data: authData } = await supabase.auth.signInWithPassword(data);
+      if (error) {
+        toast.error("Credenciais inválidas", { description: "E-mail ou senha incorretos." });
+        return;
+      }
+      toast.success("Bem-vindo de volta!");
+    } catch (err: any) {
+      toast.error("Erro inesperado", { description: err.message });
+      console.error(err);
+    } finally {
+      setSubmitting(false);
     }
-    toast.success("Bem-vindo de volta!");
   };
 
   const onGoogle = async () => {
@@ -58,7 +65,7 @@ function LoginPage() {
         </div>
         <div>
           <h1 className="text-4xl font-semibold tracking-tight">
-            Gestão financeira <br /> da sua rede de clínicas.
+            Gestão financeira <br /> de empresas e contas pessoais.
           </h1>
           <p className="mt-4 text-muted-foreground max-w-md">
             Fluxo de caixa, contas a pagar e a receber, dashboard consolidado — tudo num só lugar.

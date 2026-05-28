@@ -12,10 +12,12 @@ export const Route = createFileRoute("/_authenticated/categorias")({
         { name: "kind", label: "Tipo", type: "select", required: true, options: [
           { value: "receita", label: "Receita" }, { value: "despesa", label: "Despesa" },
         ]},
+        { name: "color", label: "Cor de identificação", type: "color", required: true },
       ]}
       columns={[
         { key: "name", label: "Nome" },
         { key: "kind", label: "Tipo" },
+        { key: "color", label: "Cor", format: "color" },
       ]}
     />
   ),

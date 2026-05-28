@@ -36,20 +36,35 @@ function SignupPage() {
 
   const onSubmit = async (data: Form) => {
     setSubmitting(true);
-    const { error } = await supabase.auth.signUp({
+    const { data: authData, error } = await supabase.auth.signUp({
       email: data.email,
       password: data.password,
       options: {
         data: { full_name: data.full_name },
-        emailRedirectTo: window.location.origin,
       },
     });
     setSubmitting(false);
+
     if (error) {
-      toast.error("Falha no cadastro", { description: error.message });
+      if (error.message.includes("already registered")) {
+        toast.error("E-mail já cadastrado.", { description: "Tente fazer login com esse e-mail." });
+      } else {
+        toast.error("Falha no cadastro", { description: error.message });
+      }
       return;
     }
-    toast.success("Conta criada!", { description: "Verifique seu e-mail caso solicitado." });
+
+    // Se a sessão foi criada imediatamente = e-mail confirmação desativado no Supabase
+    if (authData.session) {
+      toast.success("Conta criada! Bem-vindo.");
+      nav({ to: "/dashboard", replace: true });
+    } else {
+      // E-mail de confirmação ainda ativo no Supabase — redireciona para login
+      toast.success("Conta criada!", {
+        description: "Confirme seu e-mail e depois faça login.",
+      });
+      nav({ to: "/login", replace: true });
+    }
   };
 
   return (

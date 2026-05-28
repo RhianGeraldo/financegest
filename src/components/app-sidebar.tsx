@@ -2,8 +2,6 @@ import { Link, useRouterState } from "@tanstack/react-router";
 import {
   LayoutDashboard,
   ArrowLeftRight,
-  ArrowDownCircle,
-  ArrowUpCircle,
   Landmark,
   Tags,
   Building2,
@@ -11,6 +9,7 @@ import {
   Wallet,
   LogOut,
   Users,
+  BarChart3,
 } from "lucide-react";
 import {
   Sidebar,
@@ -31,8 +30,7 @@ import { Button } from "./ui/button";
 const main = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   { title: "Transações", url: "/transacoes", icon: ArrowLeftRight },
-  { title: "A pagar", url: "/a-pagar", icon: ArrowUpCircle },
-  { title: "A receber", url: "/a-receber", icon: ArrowDownCircle },
+  { title: "Relatórios", url: "/relatorios", icon: BarChart3 },
 ];
 const cadastros = [
   { title: "Contas bancárias", url: "/contas", icon: Landmark },
@@ -48,16 +46,16 @@ export function AppSidebar() {
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader className="border-b">
-        <div className="flex items-center gap-2 px-2 py-1.5">
-          <div className="size-8 rounded-lg bg-primary/15 text-primary flex items-center justify-center">
+        <div className="flex items-center gap-2 py-1.5 group-data-[collapsible=icon]:justify-center">
+          <div className="size-8 shrink-0 rounded-lg bg-primary/15 text-primary flex items-center justify-center">
             <Wallet className="size-4" />
           </div>
-          <div className="flex flex-col leading-tight">
-            <span className="text-sm font-semibold">Caixa</span>
-            <span className="text-[10px] text-muted-foreground">Gestão financeira</span>
+          <div className="flex flex-col min-w-0 leading-tight group-data-[collapsible=icon]:hidden">
+            <span className="text-sm font-semibold truncate">Gestão Financeira</span>
+            <span className="text-[10px] text-muted-foreground truncate">Sistema de Caixa</span>
           </div>
         </div>
-        <div className="px-2 pb-2">
+        <div className="pb-2 group-data-[collapsible=icon]:hidden">
           <CompanySwitcher />
         </div>
       </SidebarHeader>
@@ -123,14 +121,14 @@ export function AppSidebar() {
       </SidebarContent>
 
       <SidebarFooter className="border-t">
-        <div className="flex items-center gap-2 px-2 py-1.5">
-          <div className="size-8 rounded-full bg-accent text-accent-foreground flex items-center justify-center text-xs font-medium">
+        <div className="flex items-center gap-2 py-1.5 group-data-[collapsible=icon]:justify-center">
+          <div className="size-8 shrink-0 rounded-full bg-accent text-accent-foreground flex items-center justify-center text-xs font-medium">
             {user?.email?.[0]?.toUpperCase() ?? "?"}
           </div>
-          <div className="flex-1 min-w-0">
+          <div className="flex-1 min-w-0 group-data-[collapsible=icon]:hidden">
             <p className="text-xs font-medium truncate">{user?.email}</p>
           </div>
-          <Button variant="ghost" size="icon" onClick={signOut} title="Sair">
+          <Button variant="ghost" size="icon" onClick={signOut} title="Sair" className="shrink-0 group-data-[collapsible=icon]:hidden">
             <LogOut className="size-4" />
           </Button>
         </div>

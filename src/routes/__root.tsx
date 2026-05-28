@@ -62,7 +62,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       {
         name: "description",
         content:
-          "Sistema financeiro multiempresa para clínicas: fluxo de caixa, contas a pagar e a receber, dashboard consolidado.",
+          "Sistema financeiro para empresas e contas pessoais: fluxo de caixa, contas a pagar e a receber, dashboard consolidado.",
       },
     ],
     links: [{ rel: "stylesheet", href: appCss }],

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Trash2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
@@ -23,10 +24,6 @@ function EmpresasPage() {
   const [open, setOpen] = useState(false);
   const [seeding, setSeeding] = useState(false);
 
-  if (!hasRole("super_admin")) {
-    return <p className="text-sm text-muted-foreground">Apenas Super Admin pode gerenciar empresas.</p>;
-  }
-
   const { data } = useQuery({
     queryKey: ["companies-admin"],
     queryFn: async () => {
@@ -34,10 +31,14 @@ function EmpresasPage() {
       if (error) throw error;
       return data ?? [];
     },
+    enabled: hasRole("super_admin"),
   });
 
+  if (!hasRole("super_admin")) {
+    return <p className="text-sm text-muted-foreground">Apenas Super Admin pode gerenciar empresas.</p>;
+  }
+
   const remove = async (id: string) => {
-    if (!confirm("Excluir empresa? Todos os dados ligados serão removidos.")) return;
     const { error } = await supabase.from("companies").delete().eq("id", id);
     if (error) return toast.error("Erro", { description: error.message });
     toast.success("Empresa excluída");
@@ -47,17 +48,17 @@ function EmpresasPage() {
 
   const seedDemo = async () => {
     if (!user) return;
-    if (!confirm("Criar dados de demonstração (5 clínicas + 2 financeiros pessoais + transações)?")) return;
+    if (!confirm("Criar dados de demonstração (5 empresas + 2 contas pessoais + transações)?")) return;
     setSeeding(true);
     try {
       const demos = [
-        { name: "Clínica 1", kind: "clinica", color: "#6366f1" },
-        { name: "Clínica 2", kind: "clinica", color: "#8b5cf6" },
-        { name: "Clínica 3", kind: "clinica", color: "#06b6d4" },
-        { name: "Clínica 4", kind: "clinica", color: "#10b981" },
-        { name: "Clínica 5", kind: "clinica", color: "#f59e0b" },
-        { name: "Financeiro Pessoal Sócio 1", kind: "pessoal", color: "#ec4899" },
-        { name: "Financeiro Pessoal Sócio 2", kind: "pessoal", color: "#ef4444" },
+        { name: "Empresa 1", kind: "clinica", color: "#6366f1" },
+        { name: "Empresa 2", kind: "clinica", color: "#8b5cf6" },
+        { name: "Empresa 3", kind: "clinica", color: "#06b6d4" },
+        { name: "Empresa 4", kind: "clinica", color: "#10b981" },
+        { name: "Empresa 5", kind: "clinica", color: "#f59e0b" },
+        { name: "Conta Pessoal 1", kind: "pessoal", color: "#ec4899" },
+        { name: "Conta Pessoal 2", kind: "pessoal", color: "#ef4444" },
       ];
       const { data: comps, error } = await supabase.from("companies").insert(demos).select();
       if (error) throw error;
@@ -88,7 +89,7 @@ function EmpresasPage() {
 
         // ~12 transações distribuídas nos últimos 3 meses
         const now = new Date();
-        const txs = [];
+        const txs: any[] = [];
         for (let i = 0; i < 12; i++) {
           const d = new Date(now.getFullYear(), now.getMonth() - (i % 3), 1 + (i * 2 + 1));
           const iso = d.toISOString().slice(0, 10);
@@ -148,9 +149,25 @@ function EmpresasPage() {
                   <p className="text-xs text-muted-foreground capitalize">{c.kind}</p>
                 </div>
               </div>
-              <Button size="icon" variant="ghost" onClick={() => remove(c.id)}>
-                <Trash2 className="size-4 text-destructive" />
-              </Button>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button size="icon" variant="ghost">
+                    <Trash2 className="size-4 text-destructive" />
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Excluir empresa?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Esta ação não pode ser desfeita. Todos os dados ligados (contas, categorias, transações) serão removidos permanentemente.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction onClick={() => remove(c.id)}>Excluir</AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </div>
           ))}
           {(data ?? []).length === 0 && (
@@ -195,8 +212,8 @@ function NewCompanyDialog({ onClose }: { onClose: () => void }) {
           <Select value={kind} onValueChange={(v: "clinica"|"pessoal") => setKind(v)}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="clinica">Clínica</SelectItem>
-              <SelectItem value="pessoal">Financeiro pessoal</SelectItem>
+              <SelectItem value="clinica">Empresa (Comercial)</SelectItem>
+              <SelectItem value="pessoal">Conta Pessoal</SelectItem>
             </SelectContent>
           </Select>
         </div>
