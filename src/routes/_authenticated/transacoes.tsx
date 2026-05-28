@@ -50,7 +50,7 @@ function TransacoesPage() {
     return true;
   });
 
-  const { data: txs } = useQuery({
+  const { data: txs, isPending } = useQuery({
     queryKey: ["transactions", selectedCompanyId],
     queryFn: async () => {
       let q = supabase.from("transactions").select("*").order("due_date", { ascending: false });
@@ -276,13 +276,19 @@ function TransacoesPage() {
                     </tr>
                   );
                 })}
-                {filtered.length === 0 && (
+                {isPending ? (
+                  <tr>
+                    <td colSpan={6} className="py-12 text-center text-sm text-muted-foreground animate-pulse">
+                      Carregando transações...
+                    </td>
+                  </tr>
+                ) : filtered.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="py-12 text-center text-sm text-muted-foreground">
                       Nenhuma transação encontrada.
                     </td>
                   </tr>
-                )}
+                ) : null}
               </tbody>
             </table>
           </div>

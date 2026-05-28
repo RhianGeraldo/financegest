@@ -39,7 +39,7 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
 function DashboardPage() {
   const { selectedCompanyId, companies } = useAuth();
 
-  const { data: tx } = useQuery({
+  const { data: tx, isPending: txLoading } = useQuery({
     queryKey: ["tx", selectedCompanyId],
     queryFn: async () => {
       let q = supabase
@@ -54,7 +54,7 @@ function DashboardPage() {
     },
   });
 
-  const { data: banks } = useQuery({
+  const { data: banks, isPending: banksLoading } = useQuery({
     queryKey: ["banks", selectedCompanyId],
     queryFn: async () => {
       let q = supabase.from("bank_accounts").select("initial_balance");
@@ -133,6 +133,20 @@ function DashboardPage() {
         </div>,
         headerNode
       )}
+
+      {(txLoading || banksLoading) ? (
+        <div className="space-y-6 animate-pulse">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+            {[...Array(6)].map((_, i) => <div key={i} className="h-24 bg-muted/60 rounded-xl"></div>)}
+          </div>
+          <div className="grid gap-4 lg:grid-cols-3">
+            <div className="lg:col-span-2 h-[350px] bg-muted/60 rounded-xl"></div>
+            <div className="h-[350px] bg-muted/60 rounded-xl"></div>
+          </div>
+        </div>
+      ) : (
+        <>
+
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         {stats.map((s) => (
@@ -257,6 +271,7 @@ function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+      )}
     </div>
   );
 }
