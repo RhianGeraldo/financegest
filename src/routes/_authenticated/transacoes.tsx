@@ -118,7 +118,12 @@ function TransacoesPage() {
       {headerNode && createPortal(
         <div className="flex flex-col">
           <h1 className="text-xl font-semibold tracking-tight leading-none">Transações</h1>
-          <p className="text-xs text-muted-foreground mt-1">{filtered.length} registro(s)</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            <span className="font-medium text-foreground">
+              {selectedCompanyId === "all_clinica" ? "Consolidado Comercial" : selectedCompanyId === "all_pessoal" ? "Consolidado Pessoal" : companies.find((c) => c.id === selectedCompanyId)?.name ?? ""}
+            </span>
+            {" • "}{filtered.length} registro(s)
+          </p>
         </div>,
         headerNode
       )}

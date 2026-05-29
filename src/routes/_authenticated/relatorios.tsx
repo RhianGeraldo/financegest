@@ -130,7 +130,12 @@ function RelatoriosPage() {
       {headerNode && createPortal(
         <div className="flex flex-col">
           <h1 className="text-xl font-semibold tracking-tight leading-none">Relatórios Gerenciais</h1>
-          <p className="text-xs text-muted-foreground mt-1">Análise financeira de {flowData.length} meses</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            <span className="font-medium text-foreground">
+              {selectedCompanyId === "all_clinica" ? "Consolidado Comercial" : selectedCompanyId === "all_pessoal" ? "Consolidado Pessoal" : companies.find((c) => c.id === selectedCompanyId)?.name ?? ""}
+            </span>
+            {" • "}Análise financeira de {flowData.length} meses
+          </p>
         </div>,
         headerNode
       )}

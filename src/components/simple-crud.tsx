@@ -74,7 +74,12 @@ export function SimpleCrudPage({ title, table, queryKey, fields, columns }: Prop
         <>
           <div className="flex flex-col">
             <h1 className="text-xl font-semibold tracking-tight leading-none">{title}</h1>
-            <p className="text-xs text-muted-foreground mt-1">{data?.length ?? 0} registro(s)</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              <span className="font-medium text-foreground">
+                {selectedCompanyId === "all_clinica" ? "Consolidado Comercial" : selectedCompanyId === "all_pessoal" ? "Consolidado Pessoal" : companies.find((c) => c.id === selectedCompanyId)?.name ?? ""}
+              </span>
+              {" • "}{data?.length ?? 0} registro(s)
+            </p>
           </div>
           {canWrite && (
             <Dialog open={open} onOpenChange={setOpen}>
