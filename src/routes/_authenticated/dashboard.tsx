@@ -44,7 +44,7 @@ function DashboardPage() {
     queryFn: async () => {
       let q = supabase
         .from("transactions")
-        .select("id, amount, type, status, due_date, paid_date, category_id, description")
+        .select("id, amount, type, status, due_date, paid_date, category_id, description, company_id")
         .order("due_date", { ascending: false })
         .limit(500);
       q = applyCompanyFilter(q, selectedCompanyId, companies);
