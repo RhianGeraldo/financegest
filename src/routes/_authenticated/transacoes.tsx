@@ -249,7 +249,10 @@ function TransacoesPage() {
                           <span className="truncate">{company.name}</span>
                         </p>
                       )}
-                      <p className="text-xs text-muted-foreground mt-0.5">{formatDate(t.due_date)}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">Vencimento: {formatDate(t.due_date)}</p>
+                      {t.paid_date && (
+                        <p className="text-xs text-muted-foreground mt-0.5">Pago em: {formatDate(t.paid_date)}</p>
+                      )}
                     </div>
                     <div className="text-right shrink-0 flex flex-col items-end">
                       <p className={`text-sm font-semibold tabular ${t.type === "entrada" ? "text-success" : "text-destructive"}`}>
@@ -304,6 +307,7 @@ function TransacoesPage() {
                   <th className="py-2 px-2">Descrição</th>
                   <th className="py-2 px-2">Tipo</th>
                   <th className="py-2 px-2">Vencimento</th>
+                  <th className="py-2 px-2">Pagamento</th>
                   <th className="py-2 px-2">Status</th>
                   <th className="py-2 px-2 text-right">Valor</th>
                   <th className="py-2 px-2 w-20"></th>
@@ -330,6 +334,7 @@ function TransacoesPage() {
                         </Badge>
                       </td>
                       <td className="py-3 px-2">{formatDate(t.due_date)}</td>
+                      <td className="py-3 px-2 text-muted-foreground">{t.paid_date ? formatDate(t.paid_date) : "-"}</td>
                       <td className="py-3 px-2">
                         <Badge variant={st === "pago" ? "default" : st === "atrasado" ? "destructive" : "secondary"}>
                           {st}
@@ -373,13 +378,13 @@ function TransacoesPage() {
                 })}
                 {isPending ? (
                   <tr>
-                    <td colSpan={6} className="py-12 text-center text-sm text-muted-foreground animate-pulse">
+                    <td colSpan={7} className="py-12 text-center text-sm text-muted-foreground animate-pulse">
                       Carregando transações...
                     </td>
                   </tr>
                 ) : filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="py-12 text-center text-sm text-muted-foreground">
+                    <td colSpan={7} className="py-12 text-center text-sm text-muted-foreground">
                       Nenhuma transação encontrada.
                     </td>
                   </tr>
