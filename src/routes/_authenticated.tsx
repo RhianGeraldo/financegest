@@ -2,6 +2,7 @@ import { createFileRoute, Outlet, useNavigate } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
+import { MobileNav } from "@/components/mobile-nav";
 import { useAuth } from "@/lib/auth";
 
 export const Route = createFileRoute("/_authenticated")({
@@ -30,12 +31,15 @@ function AuthLayout() {
         <AppSidebar />
         <div className="flex-1 flex flex-col min-w-0">
           <header className="h-14 flex items-center gap-3 border-b px-4 sticky top-0 bg-background/80 backdrop-blur z-10">
-            <SidebarTrigger />
+            <div className="hidden md:flex">
+              <SidebarTrigger />
+            </div>
             <div id="page-header" className="flex-1 flex items-center justify-between" />
           </header>
-          <main className="flex-1 p-6">
+          <main className="flex-1 p-6 pb-24 md:pb-6">
             <Outlet />
           </main>
+          <MobileNav />
         </div>
       </div>
     </SidebarProvider>
