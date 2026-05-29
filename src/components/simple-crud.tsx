@@ -16,7 +16,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Plus, Trash2, Edit2, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 
-type Field =
+export type Field =
   | { name: string; label: string; type: "text" | "money" | "color"; required?: boolean }
   | { name: string; label: string; type: "select"; required?: boolean; options: { value: string; label: string }[] };
 
@@ -251,7 +251,7 @@ export function SimpleCrudPage({ title, table, queryKey, fields, columns, compan
   );
 }
 
-function CrudDialog({ table, queryKey, fields, initialData, onClose, companyMode = "single" }: { table: string; queryKey: string; fields: Field[]; initialData?: any; onClose: () => void; companyMode?: "single" | "multiple" }) {
+export function CrudDialog({ table, queryKey, fields, initialData, onClose, companyMode = "single" }: { table: string; queryKey: string; fields: Field[]; initialData?: any; onClose: () => void; companyMode?: "single" | "multiple" }) {
   const { companies, selectedCompanyId } = useAuth();
   const qc = useQueryClient();
 

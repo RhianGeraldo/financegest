@@ -494,14 +494,14 @@ function TransactionDialog({ onClose, initialData }: { onClose: () => void; init
   const [saving, setSaving] = useState(false);
 
   const { data: categories } = useQuery({
-    queryKey: ["categories", form.company_id],
+    queryKey: ["categories", form.company_id, form.cost_center_id],
     queryFn: async () => {
-      if (!form.company_id) return [];
-      const { data, error } = await supabase.from("categories").select("id, name").contains("company_ids", [form.company_id]);
+      if (!form.company_id || !form.cost_center_id) return [];
+      const { data, error } = await supabase.from("categories").select("id, name").contains("company_ids", [form.company_id]).eq("cost_center_id", form.cost_center_id);
       if (error) throw error;
       return data ?? [];
     },
-    enabled: !!form.company_id,
+    enabled: !!form.company_id && !!form.cost_center_id,
   });
 
   const { data: costCenters } = useQuery({
@@ -640,7 +640,7 @@ function TransactionDialog({ onClose, initialData }: { onClose: () => void; init
           </div>
           <div className="space-y-1.5">
             <Label>Centro de Custo</Label>
-            <Select value={form.cost_center_id} onValueChange={(v) => setForm({ ...form, cost_center_id: v })}>
+            <Select value={form.cost_center_id} onValueChange={(v) => setForm({ ...form, cost_center_id: v, category_id: "none" })}>
               <SelectTrigger><SelectValue placeholder="Nenhum" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">Nenhum</SelectItem>
