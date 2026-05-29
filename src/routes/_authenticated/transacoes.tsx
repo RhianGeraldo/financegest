@@ -266,7 +266,7 @@ function TransacoesPage() {
                   {canWrite && (
                     <div className="flex justify-end gap-2 mt-2 pt-2 border-t border-dashed border-border/50">
                       {t.status !== "pago" && (
-                        <Button size="sm" variant="secondary" className="h-7 text-xs bg-success/10 text-success hover:bg-success/20 border-none px-2" onClick={() => { setMarkPaidId(t.id); setMarkPaidDate(todayISO()); }}>
+                        <Button size="sm" variant="secondary" className="h-7 text-xs bg-success/10 text-success hover:bg-success/20 border-none px-2" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setMarkPaidId(t.id); setMarkPaidDate(todayISO()); }}>
                           <CheckCircle2 className="size-3 mr-1" /> Marcar Pago
                         </Button>
                       )}
@@ -347,7 +347,7 @@ function TransacoesPage() {
                         {canWrite && (
                           <div className="flex gap-1 justify-end">
                             {t.status !== "pago" && (
-                              <Button size="icon" variant="ghost" onClick={() => { setMarkPaidId(t.id); setMarkPaidDate(todayISO()); }} title="Marcar pago">
+                              <Button size="icon" variant="ghost" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setMarkPaidId(t.id); setMarkPaidDate(todayISO()); }} title="Marcar pago">
                                 <CheckCircle2 className="size-4 text-success" />
                               </Button>
                             )}
