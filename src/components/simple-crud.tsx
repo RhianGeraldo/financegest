@@ -93,8 +93,68 @@ export function SimpleCrudPage({ title, table, queryKey, fields, columns }: Prop
 
       <Card>
         <CardContent className="pt-0 px-0">
-          <div className="overflow-auto max-h-[calc(100vh-240px)]">
-            <table className="w-full text-sm relative">
+          {/* Mobile View */}
+          <div className="md:hidden flex flex-col">
+            {(data ?? []).map((row: any) => {
+              const company = companies.find((c) => c.id === row.company_id);
+              return (
+                <div key={row.id} className="p-4 border-b last:border-0 hover:bg-accent/30 flex flex-col gap-2">
+                  {company && (
+                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1">
+                      <span className="size-1.5 rounded-full shrink-0" style={{ background: company.color }} />
+                      <span className="truncate">{company.name}</span>
+                    </div>
+                  )}
+                  {columns.map((c) => (
+                    <div key={c.key} className="flex justify-between items-center text-sm">
+                      <span className="text-muted-foreground">{c.label}:</span>
+                      {c.format === "money" ? (
+                        <span className="font-medium tabular">{formatBRL(row[c.key])}</span>
+                      ) : c.format === "color" ? (
+                        <div className="flex items-center gap-2">
+                          <span className="size-3 rounded-full shadow-sm" style={{ background: row[c.key] }} />
+                          <span className="text-muted-foreground text-xs">{row[c.key]}</span>
+                        </div>
+                      ) : (
+                        <span className="font-medium">{String(row[c.key] ?? "")}</span>
+                      )}
+                    </div>
+                  ))}
+                  {canWrite && (
+                    <div className="flex justify-end gap-2 mt-2 pt-2 border-t border-dashed border-border/50">
+                      <Button size="sm" variant="ghost" className="h-7 w-7 text-muted-foreground px-0" onClick={() => handleEdit(row)}>
+                        <Edit2 className="size-3" />
+                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button size="sm" variant="ghost" className="h-7 text-xs text-destructive hover:bg-destructive/10 px-2">
+                            <Trash2 className="size-3 mr-1" /> Excluir
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Excluir registro?</AlertDialogTitle>
+                            <AlertDialogDescription>Esta ação não pode ser desfeita. O registro será removido permanentemente.</AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => remove(row.id)}>Excluir</AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+            {(data ?? []).length === 0 && (
+              <div className="py-10 text-center text-sm text-muted-foreground">Nenhum registro.</div>
+            )}
+          </div>
+
+          {/* Desktop View */}
+          <div className="hidden md:block overflow-auto max-h-[calc(100vh-240px)]">
+            <table className="w-full text-sm relative min-w-[500px]">
               <thead className="text-xs text-muted-foreground border-b sticky top-0 bg-card z-10 shadow-sm">
               <tr className="text-left">
                 <th className="py-2 px-2">Empresa</th>
