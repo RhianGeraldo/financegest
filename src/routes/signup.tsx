@@ -13,7 +13,7 @@ import { Wallet } from "lucide-react";
 
 export const Route = createFileRoute("/signup")({
   component: SignupPage,
-  head: () => ({ meta: [{ title: "Criar conta — Caixa" }] }),
+  head: () => ({ meta: [{ title: "Criar conta — Gestão Financeira" }] }),
 });
 
 const schema = z.object({

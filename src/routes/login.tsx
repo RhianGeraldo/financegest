@@ -14,7 +14,7 @@ import { Wallet } from "lucide-react";
 
 export const Route = createFileRoute("/login")({
   component: LoginPage,
-  head: () => ({ meta: [{ title: "Entrar — Caixa" }] }),
+  head: () => ({ meta: [{ title: "Entrar — Gestão Financeira" }] }),
 });
 
 const schema = z.object({

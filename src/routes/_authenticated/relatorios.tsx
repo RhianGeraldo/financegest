@@ -23,7 +23,7 @@ import {
 
 export const Route = createFileRoute("/_authenticated/relatorios")({
   component: RelatoriosPage,
-  head: () => ({ meta: [{ title: "Relatórios — Caixa" }] }),
+  head: () => ({ meta: [{ title: "Relatórios — Gestão Financeira" }] }),
 });
 
 function RelatoriosPage() {

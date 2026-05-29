@@ -15,7 +15,7 @@ import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/empresas")({
   component: EmpresasPage,
-  head: () => ({ meta: [{ title: "Empresas — Caixa" }] }),
+  head: () => ({ meta: [{ title: "Empresas — Gestão Financeira" }] }),
 });
 
 function EmpresasPage() {

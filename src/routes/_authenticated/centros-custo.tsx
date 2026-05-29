@@ -11,5 +11,5 @@ export const Route = createFileRoute("/_authenticated/centros-custo")({
       columns={[{ key: "name", label: "Nome" }]}
     />
   ),
-  head: () => ({ meta: [{ title: "Centros de custo — Caixa" }] }),
+  head: () => ({ meta: [{ title: "Centros de custo — Gestão Financeira" }] }),
 });

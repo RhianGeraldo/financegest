@@ -19,5 +19,5 @@ export const Route = createFileRoute("/_authenticated/contas")({
       ]}
     />
   ),
-  head: () => ({ meta: [{ title: "Contas — Caixa" }] }),
+  head: () => ({ meta: [{ title: "Contas — Gestão Financeira" }] }),
 });

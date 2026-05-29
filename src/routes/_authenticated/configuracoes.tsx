@@ -18,7 +18,7 @@ import {
 
 export const Route = createFileRoute("/_authenticated/configuracoes")({
   component: ConfiguracoesPage,
-  head: () => ({ meta: [{ title: "Configurações — Caixa" }] }),
+  head: () => ({ meta: [{ title: "Configurações — Gestão Financeira" }] }),
 });
 
 function ConfiguracoesPage() {

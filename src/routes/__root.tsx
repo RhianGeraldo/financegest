@@ -58,14 +58,17 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Caixa — Gestão Financeira" },
+      { title: "Gestão Financeira" },
       {
         name: "description",
         content:
           "Sistema financeiro para empresas e contas pessoais: fluxo de caixa, contas a pagar e a receber, dashboard consolidado.",
       },
     ],
-    links: [{ rel: "stylesheet", href: appCss }],
+    links: [
+      { rel: "icon", type: "image/png", href: "/favicon.png" },
+      { rel: "stylesheet", href: appCss }
+    ],
   }),
   shellComponent: RootShell,
   component: RootComponent,

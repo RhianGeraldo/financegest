@@ -21,5 +21,5 @@ export const Route = createFileRoute("/_authenticated/categorias")({
       ]}
     />
   ),
-  head: () => ({ meta: [{ title: "Categorias — Caixa" }] }),
+  head: () => ({ meta: [{ title: "Categorias — Gestão Financeira" }] }),
 });

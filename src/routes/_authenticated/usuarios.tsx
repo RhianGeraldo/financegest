@@ -21,7 +21,7 @@ import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/usuarios")({
   component: UsuariosPage,
-  head: () => ({ meta: [{ title: "Usuários — Caixa" }] }),
+  head: () => ({ meta: [{ title: "Usuários — Gestão Financeira" }] }),
 });
 
 function UsuariosPage() {

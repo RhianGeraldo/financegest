@@ -25,7 +25,7 @@ import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/transacoes")({
   component: TransacoesPage,
-  head: () => ({ meta: [{ title: "Transações — Caixa" }] }),
+  head: () => ({ meta: [{ title: "Transações — Gestão Financeira" }] }),
 });
 
 function TransacoesPage() {

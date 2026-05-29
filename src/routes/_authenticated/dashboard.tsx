@@ -33,7 +33,7 @@ import {
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   component: DashboardPage,
-  head: () => ({ meta: [{ title: "Dashboard — Caixa" }] }),
+  head: () => ({ meta: [{ title: "Dashboard — Gestão Financeira" }] }),
 });
 
 function DashboardPage() {
