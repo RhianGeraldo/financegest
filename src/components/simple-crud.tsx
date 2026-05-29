@@ -337,7 +337,7 @@ function CrudDialog({ table, queryKey, fields, initialData, onClose, companyMode
           <div className="space-y-2">
             <Label>Empresas disponíveis</Label>
             <div className="flex flex-col gap-2 border rounded-md p-3 max-h-[200px] overflow-auto">
-              {companies.map((c) => (
+              {filteredCompanies.map((c) => (
                 <label key={c.id} className="flex items-center gap-2 text-sm cursor-pointer hover:bg-accent/50 p-1.5 rounded-md -mx-1.5 transition-colors">
                   <Checkbox 
                     checked={companyIds.includes(c.id)} 
