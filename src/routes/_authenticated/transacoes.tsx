@@ -455,6 +455,42 @@ function TransactionDialog({ onClose, initialData }: { onClose: () => void; init
       amountType: "total" as "total" | "parcela",
     };
   });
+
+  useEffect(() => {
+    if (initialData) {
+      setForm({
+        company_id: initialData.company_id ?? getSelectedCompanyId(),
+        type: initialData.type ?? "saida",
+        description: initialData.description ?? "",
+        amount: initialData.amount ? maskBRL(Math.round(Number(initialData.amount) * 100).toString()) : "",
+        due_date: initialData.due_date ?? todayISO(),
+        status: initialData.status ?? "pendente",
+        category_id: initialData.category_id ?? "none",
+        cost_center_id: initialData.cost_center_id ?? "none",
+        notes: initialData.notes ?? "",
+        paid_date: initialData.paid_date ?? todayISO(),
+        isInstallment: false,
+        installments: "2",
+        amountType: "total" as "total" | "parcela",
+      });
+    } else {
+      setForm({
+        company_id: getSelectedCompanyId(),
+        type: "saida" as "entrada" | "saida",
+        description: "",
+        amount: "",
+        due_date: todayISO(),
+        status: "pendente" as "pendente" | "pago",
+        category_id: "none",
+        cost_center_id: "none",
+        notes: "",
+        paid_date: todayISO(),
+        isInstallment: false,
+        installments: "2",
+        amountType: "total" as "total" | "parcela",
+      });
+    }
+  }, [initialData]);
   const [saving, setSaving] = useState(false);
 
   const { data: categories } = useQuery({
