@@ -56,10 +56,7 @@ function TransacoesPage() {
   const { data: txs, isPending } = useQuery({
     queryKey: ["transactions", selectedCompanyId],
     queryFn: async () => {
-      let q = supabase.from("transactions").select(`
-        *,
-        paid_by_profile:profiles!transactions_paid_by_fkey(full_name)
-      `).order("due_date", { ascending: false });
+      let q = supabase.from("transactions").select("*").order("due_date", { ascending: false });
       q = applyCompanyFilter(q, selectedCompanyId, companies);
       const { data, error } = await q;
       if (error) throw error;
@@ -474,6 +471,17 @@ function TransactionDialog({ onClose, initialData }: { onClose: () => void; init
     enabled: !!form.company_id,
   });
 
+  const { data: paidByProfile } = useQuery({
+    queryKey: ["profile", initialData?.paid_by],
+    queryFn: async () => {
+      if (!initialData?.paid_by) return null;
+      const { data, error } = await supabase.from("profiles").select("full_name").eq("id", initialData.paid_by).single();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!initialData?.paid_by,
+  });
+
   const submit = async () => {
     if (!form.company_id) return toast.error("Selecione uma empresa");
     if (!form.description) return toast.error("Informe a descrição");
@@ -620,10 +628,10 @@ function TransactionDialog({ onClose, initialData }: { onClose: () => void; init
               <DatePicker value={form.paid_date} onChange={(v) => setForm({ ...form, paid_date: v })} />
             </div>
           )}
-          {form.status === "pago" && initialData?.paid_by_profile && (
+          {form.status === "pago" && paidByProfile && (
             <div className="col-span-1 sm:col-span-2 space-y-1.5 mt-2">
               <Label className="text-muted-foreground text-xs block">
-                Baixa realizada por: <span className="font-medium text-foreground">{initialData.paid_by_profile.full_name}</span>
+                Baixa realizada por: <span className="font-medium text-foreground">{paidByProfile.full_name}</span>
               </Label>
             </div>
           )}
