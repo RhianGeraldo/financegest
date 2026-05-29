@@ -72,13 +72,14 @@ function DashboardPage() {
 
   const txs = tx ?? [];
   const paid = txs.filter((t) => t.status === "pago");
-  const monthPaid = paid.filter((t) => (t.paid_date ?? "").startsWith(ym));
+  const monthPaid = paid.filter((t) => t.due_date.startsWith(ym));
   const inMonth = monthPaid.filter((t) => t.type === "entrada").reduce((s, t) => s + Number(t.amount), 0);
   const outMonth = monthPaid.filter((t) => t.type === "saida").reduce((s, t) => s + Number(t.amount), 0);
   const lucro = inMonth - outMonth;
 
-  const aPagar = txs.filter((t) => t.type === "saida" && t.status === "pendente").reduce((s, t) => s + Number(t.amount), 0);
-  const aReceber = txs.filter((t) => t.type === "entrada" && t.status === "pendente").reduce((s, t) => s + Number(t.amount), 0);
+  const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split("T")[0];
+  const aPagar = txs.filter((t) => t.type === "saida" && t.status === "pendente" && t.due_date <= lastDayOfMonth).reduce((s, t) => s + Number(t.amount), 0);
+  const aReceber = txs.filter((t) => t.type === "entrada" && t.status === "pendente" && t.due_date <= lastDayOfMonth).reduce((s, t) => s + Number(t.amount), 0);
 
   const initial = (banks ?? []).reduce((s, b) => s + Number(b.initial_balance), 0);
   const saldoTotal =
