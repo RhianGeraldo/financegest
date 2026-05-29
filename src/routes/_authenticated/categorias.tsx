@@ -19,6 +19,7 @@ export const Route = createFileRoute("/_authenticated/categorias")({
         { key: "kind", label: "Tipo" },
         { key: "color", label: "Cor", format: "color" },
       ]}
+      companyMode="multiple"
     />
   ),
   head: () => ({ meta: [{ title: "Categorias — Gestão Financeira" }] }),

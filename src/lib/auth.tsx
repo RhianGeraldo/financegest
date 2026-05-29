@@ -38,6 +38,18 @@ export function applyCompanyFilter(q: any, selectedCompanyId: string, companies:
   return q.eq("company_id", selectedCompanyId);
 }
 
+export function applyCompanyIdsFilter(q: any, selectedCompanyId: string, companies: Company[]) {
+  if (selectedCompanyId === "all_clinica") {
+    const ids = companies.filter((c) => c.kind === "clinica").map((c) => c.id);
+    return ids.length > 0 ? q.overlaps("company_ids", ids) : q.overlaps("company_ids", ["00000000-0000-0000-0000-000000000000"]);
+  }
+  if (selectedCompanyId === "all_pessoal") {
+    const ids = companies.filter((c) => c.kind === "pessoal").map((c) => c.id);
+    return ids.length > 0 ? q.overlaps("company_ids", ids) : q.overlaps("company_ids", ["00000000-0000-0000-0000-000000000000"]);
+  }
+  return q.contains("company_ids", [selectedCompanyId]);
+}
+
 const Ctx = createContext<AuthState | null>(null);
 
 const SELECTED_KEY = "caixa:selected_company";

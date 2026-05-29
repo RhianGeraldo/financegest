@@ -9,6 +9,7 @@ export const Route = createFileRoute("/_authenticated/centros-custo")({
       queryKey="cost_centers"
       fields={[{ name: "name", label: "Nome", type: "text", required: true }]}
       columns={[{ key: "name", label: "Nome" }]}
+      companyMode="multiple"
     />
   ),
   head: () => ({ meta: [{ title: "Centros de custo — Gestão Financeira" }] }),

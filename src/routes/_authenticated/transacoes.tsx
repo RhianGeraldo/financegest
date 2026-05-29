@@ -497,7 +497,7 @@ function TransactionDialog({ onClose, initialData }: { onClose: () => void; init
     queryKey: ["categories", form.company_id],
     queryFn: async () => {
       if (!form.company_id) return [];
-      const { data, error } = await supabase.from("categories").select("id, name").eq("company_id", form.company_id);
+      const { data, error } = await supabase.from("categories").select("id, name").contains("company_ids", [form.company_id]);
       if (error) throw error;
       return data ?? [];
     },
@@ -508,7 +508,7 @@ function TransactionDialog({ onClose, initialData }: { onClose: () => void; init
     queryKey: ["cost_centers", form.company_id],
     queryFn: async () => {
       if (!form.company_id) return [];
-      const { data, error } = await supabase.from("cost_centers").select("id, name").eq("company_id", form.company_id);
+      const { data, error } = await supabase.from("cost_centers").select("id, name").contains("company_ids", [form.company_id]);
       if (error) throw error;
       return data ?? [];
     },

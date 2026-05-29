@@ -2,7 +2,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth, applyCompanyFilter } from "@/lib/auth";
+import { useAuth, applyCompanyFilter, applyCompanyIdsFilter } from "@/lib/auth";
 import { formatBRL, maskBRL, parseBRL } from "@/lib/format";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Plus, Trash2, Edit2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -26,9 +27,10 @@ interface Props {
   queryKey: string;
   fields: Field[];
   columns: Column[];
+  companyMode?: "single" | "multiple";
 }
 
-export function SimpleCrudPage({ title, table, queryKey, fields, columns }: Props) {
+export function SimpleCrudPage({ title, table, queryKey, fields, columns, companyMode = "single" }: Props) {
   const { selectedCompanyId, companies, canWrite } = useAuth();
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
@@ -48,7 +50,11 @@ export function SimpleCrudPage({ title, table, queryKey, fields, columns }: Prop
     queryKey: [queryKey, selectedCompanyId],
     queryFn: async () => {
       let q = supabase.from(table).select("*").order("created_at", { ascending: false });
-      q = applyCompanyFilter(q, selectedCompanyId, companies);
+      if (companyMode === "multiple") {
+        q = applyCompanyIdsFilter(q, selectedCompanyId, companies);
+      } else {
+        q = applyCompanyFilter(q, selectedCompanyId, companies);
+      }
       const { data, error } = await q;
       if (error) throw error;
       return data ?? [];
@@ -84,7 +90,7 @@ export function SimpleCrudPage({ title, table, queryKey, fields, columns }: Prop
           {canWrite && (
             <Dialog open={open} onOpenChange={setOpen}>
               <DialogTrigger asChild><Button size="sm" onClick={handleCreate}><Plus className="size-4 mr-1" /> Novo</Button></DialogTrigger>
-              <CrudDialog table={table} queryKey={queryKey} fields={fields} initialData={editData} onClose={() => setOpen(false)} />
+              <CrudDialog table={table} queryKey={queryKey} fields={fields} initialData={editData} onClose={() => setOpen(false)} companyMode={companyMode} />
             </Dialog>
           )}
         </>,
@@ -96,13 +102,19 @@ export function SimpleCrudPage({ title, table, queryKey, fields, columns }: Prop
           {/* Mobile View */}
           <div className="md:hidden flex flex-col">
             {(data ?? []).map((row: any) => {
-              const company = companies.find((c) => c.id === row.company_id);
+              const rowCompanies = companyMode === "multiple"
+                ? companies.filter(c => (row.company_ids ?? []).includes(c.id))
+                : companies.filter(c => c.id === row.company_id);
               return (
                 <div key={row.id} className="p-4 border-b last:border-0 hover:bg-accent/30 flex flex-col gap-2">
-                  {company && (
-                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1">
-                      <span className="size-1.5 rounded-full shrink-0" style={{ background: company.color }} />
-                      <span className="truncate">{company.name}</span>
+                  {rowCompanies.length > 0 && (
+                    <div className="flex flex-wrap items-center gap-2 mb-1">
+                      {rowCompanies.map(company => (
+                        <div key={company.id} className="flex items-center gap-1.5 text-xs text-muted-foreground bg-accent/50 px-2 py-0.5 rounded-full">
+                          <span className="size-1.5 rounded-full shrink-0" style={{ background: company.color }} />
+                          <span className="truncate">{company.name}</span>
+                        </div>
+                      ))}
                     </div>
                   )}
                   {columns.map((c) => (
@@ -166,16 +178,20 @@ export function SimpleCrudPage({ title, table, queryKey, fields, columns }: Prop
             </thead>
             <tbody>
               {(data ?? []).map((row: any) => {
-                const company = companies.find((c) => c.id === row.company_id);
+                const rowCompanies = companyMode === "multiple"
+                  ? companies.filter(c => (row.company_ids ?? []).includes(c.id))
+                  : companies.filter(c => c.id === row.company_id);
                 return (
                   <tr key={row.id} className="border-b last:border-0 hover:bg-accent/30">
                     <td className="py-3 px-2">
-                      {company && (
-                        <span className="inline-flex items-center gap-1.5 text-xs">
-                          <span className="size-1.5 rounded-full" style={{ background: company.color }} />
-                          {company.name}
-                        </span>
-                      )}
+                      <div className="flex flex-wrap gap-1">
+                        {rowCompanies.map(company => (
+                          <span key={company.id} className="inline-flex items-center gap-1.5 text-xs bg-accent/50 px-2 py-0.5 rounded-full">
+                            <span className="size-1.5 rounded-full" style={{ background: company.color }} />
+                            {company.name}
+                          </span>
+                        ))}
+                      </div>
                     </td>
                     {columns.map((c) => (
                       <td key={c.key} className={`py-3 px-2 ${c.align === "right" ? "text-right tabular" : ""}`}>
@@ -234,7 +250,7 @@ export function SimpleCrudPage({ title, table, queryKey, fields, columns }: Prop
   );
 }
 
-function CrudDialog({ table, queryKey, fields, initialData, onClose }: { table: string; queryKey: string; fields: Field[]; initialData?: any; onClose: () => void }) {
+function CrudDialog({ table, queryKey, fields, initialData, onClose, companyMode = "single" }: { table: string; queryKey: string; fields: Field[]; initialData?: any; onClose: () => void; companyMode?: "single" | "multiple" }) {
   const { companies, selectedCompanyId } = useAuth();
   const qc = useQueryClient();
 
@@ -255,10 +271,12 @@ function CrudDialog({ table, queryKey, fields, initialData, onClose }: { table: 
   });
 
   const [companyId, setCompanyId] = useState(initialData?.company_id ?? getSelectedCompanyId());
+  const [companyIds, setCompanyIds] = useState<string[]>(initialData?.company_ids ?? [getSelectedCompanyId()]);
   const [values, setValues] = useState<Record<string, string>>({});
   
   useEffect(() => {
     setCompanyId(initialData?.company_id ?? getSelectedCompanyId());
+    setCompanyIds(initialData?.company_ids ?? [getSelectedCompanyId()]);
     
     if (!initialData) {
       const initNew: Record<string, string> = {};
@@ -284,8 +302,10 @@ function CrudDialog({ table, queryKey, fields, initialData, onClose }: { table: 
   const [saving, setSaving] = useState(false);
 
   const submit = async () => {
-    if (!companyId) return toast.error("Selecione uma empresa");
-    const payload: any = { company_id: companyId };
+    if (companyMode === "single" && !companyId) return toast.error("Selecione uma empresa");
+    if (companyMode === "multiple" && companyIds.length === 0) return toast.error("Selecione ao menos uma empresa");
+    
+    const payload: any = companyMode === "multiple" ? { company_ids: companyIds } : { company_id: companyId };
     for (const f of fields) {
       const v = values[f.name];
       if (f.required && !v) return toast.error(`${f.label} é obrigatório`);
@@ -313,15 +333,36 @@ function CrudDialog({ table, queryKey, fields, initialData, onClose }: { table: 
     <DialogContent>
       <DialogHeader><DialogTitle>{initialData ? "Editar registro" : "Novo registro"}</DialogTitle></DialogHeader>
       <div className="space-y-3">
-        <div className="space-y-1.5">
-          <Label>Empresa</Label>
-          <Select value={companyId} onValueChange={setCompanyId}>
-            <SelectTrigger><SelectValue placeholder="Selecione…" /></SelectTrigger>
-            <SelectContent>
-              {filteredCompanies.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-            </SelectContent>
-          </Select>
-        </div>
+        {companyMode === "multiple" ? (
+          <div className="space-y-2">
+            <Label>Empresas disponíveis</Label>
+            <div className="flex flex-col gap-2 border rounded-md p-3 max-h-[200px] overflow-auto">
+              {companies.map((c) => (
+                <label key={c.id} className="flex items-center gap-2 text-sm cursor-pointer hover:bg-accent/50 p-1.5 rounded-md -mx-1.5 transition-colors">
+                  <Checkbox 
+                    checked={companyIds.includes(c.id)} 
+                    onCheckedChange={(checked) => {
+                      if (checked) setCompanyIds([...companyIds, c.id]);
+                      else setCompanyIds(companyIds.filter(id => id !== c.id));
+                    }}
+                  />
+                  <span className="size-2 rounded-full shrink-0" style={{ background: c.color }} />
+                  {c.name}
+                </label>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-1.5">
+            <Label>Empresa</Label>
+            <Select value={companyId} onValueChange={setCompanyId}>
+              <SelectTrigger><SelectValue placeholder="Selecione…" /></SelectTrigger>
+              <SelectContent>
+                {filteredCompanies.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
         {fields.map((f) => (
           <div key={f.name} className="space-y-1.5">
             <Label>{f.label}</Label>
