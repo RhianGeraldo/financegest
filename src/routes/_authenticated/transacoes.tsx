@@ -399,7 +399,7 @@ function TransacoesPage() {
 }
 
 function TransactionDialog({ onClose, initialData }: { onClose: () => void; initialData?: any }) {
-  const { companies, selectedCompanyId } = useAuth();
+  const { companies, selectedCompanyId, user } = useAuth();
   const qc = useQueryClient();
 
   const getSelectedCompanyId = () => {
@@ -516,6 +516,7 @@ function TransactionDialog({ onClose, initialData }: { onClose: () => void; init
         due_date: form.due_date,
         status: form.status,
         paid_date: form.status === "pago" ? form.paid_date : null,
+        paid_by: form.status === "pago" ? (initialData.status === "pago" ? initialData.paid_by : user?.id) : null,
         category_id: form.category_id !== "none" ? form.category_id : null,
         cost_center_id: form.cost_center_id !== "none" ? form.cost_center_id : null,
         notes: form.notes || null,
