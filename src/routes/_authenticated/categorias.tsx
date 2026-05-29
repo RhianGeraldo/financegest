@@ -37,6 +37,7 @@ function CategoriasPage() {
       ]}
       columns={[
         { key: "name", label: "Nome" },
+        { key: "cost_center_id", label: "Centro de Custo", format: "select" },
         { key: "color", label: "Cor", format: "color" },
       ]}
       companyMode="multiple"

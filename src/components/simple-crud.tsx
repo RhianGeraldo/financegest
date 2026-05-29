@@ -20,7 +20,7 @@ export type Field =
   | { name: string; label: string; type: "text" | "money" | "color"; required?: boolean }
   | { name: string; label: string; type: "select"; required?: boolean; options: { value: string; label: string }[] };
 
-type Column = { key: string; label: string; format?: "money" | "color"; align?: "right" };
+type Column = { key: string; label: string; format?: "money" | "color" | "select"; align?: "right" };
 
 interface Props {
   title: string;
@@ -36,6 +36,14 @@ export function SimpleCrudPage({ title, table, queryKey, fields, columns, compan
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [editData, setEditData] = useState<any>(null);
+
+  const getSelectLabel = (key: string, value: any) => {
+    const field = fields.find((f) => f.name === key);
+    if (field?.type === "select" && field.options) {
+      return field.options.find((o) => o.value === value)?.label ?? value;
+    }
+    return String(value ?? "");
+  };
 
   const handleCreate = () => {
     setEditData(null);
@@ -128,6 +136,8 @@ export function SimpleCrudPage({ title, table, queryKey, fields, columns, compan
                           <span className="size-3 rounded-full shadow-sm" style={{ background: row[c.key] }} />
                           <span className="text-muted-foreground text-xs">{row[c.key]}</span>
                         </div>
+                      ) : c.format === "select" ? (
+                        <span className="font-medium">{getSelectLabel(c.key, row[c.key])}</span>
                       ) : (
                         <span className="font-medium">{String(row[c.key] ?? "")}</span>
                       )}
@@ -203,6 +213,8 @@ export function SimpleCrudPage({ title, table, queryKey, fields, columns, compan
                             <span className="size-3 rounded-full shadow-sm" style={{ background: row[c.key] }} />
                             <span className="text-muted-foreground text-xs">{row[c.key]}</span>
                           </div>
+                        ) : c.format === "select" ? (
+                          getSelectLabel(c.key, row[c.key])
                         ) : (
                           String(row[c.key] ?? "")
                         )}
