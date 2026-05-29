@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Plus, Search, Trash2, CheckCircle2, Filter } from "lucide-react";
+import { Plus, Search, Trash2, CheckCircle2, Filter, Edit2 } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/transacoes")({
