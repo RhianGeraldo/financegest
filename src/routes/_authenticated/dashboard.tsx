@@ -227,11 +227,18 @@ function DashboardPage() {
             {recent.length === 0 && <p className="text-sm text-muted-foreground py-6 text-center">Sem transações ainda.</p>}
             {recent.map((t) => {
               const st = statusLabel(t.status, t.due_date);
+              const company = companies.find((c) => c.id === t.company_id);
               return (
                 <div key={t.id} className="flex items-center justify-between py-2 border-b last:border-0">
-                  <div className="min-w-0">
+                  <div className="min-w-0 pr-2">
                     <p className="text-sm font-medium truncate">{t.description}</p>
-                    <p className="text-xs text-muted-foreground">{formatDate(t.due_date)}</p>
+                    {company && (
+                      <p className="text-xs text-muted-foreground flex items-center gap-1.5 mt-0.5">
+                        <span className="size-1.5 rounded-full shrink-0" style={{ background: company.color }} />
+                        <span className="truncate">{company.name}</span>
+                      </p>
+                    )}
+                    <p className="text-xs text-muted-foreground mt-0.5">{formatDate(t.due_date)}</p>
                   </div>
                   <div className="text-right">
                     <p className={`text-sm font-medium tabular ${t.type === "entrada" ? "text-success" : "text-destructive"}`}>
@@ -255,11 +262,18 @@ function DashboardPage() {
             {upcoming.length === 0 && <p className="text-sm text-muted-foreground py-6 text-center">Nada pendente.</p>}
             {upcoming.map((t) => {
               const st = statusLabel(t.status, t.due_date);
+              const company = companies.find((c) => c.id === t.company_id);
               return (
                 <div key={t.id} className="flex items-center justify-between py-2 border-b last:border-0">
-                  <div className="min-w-0">
+                  <div className="min-w-0 pr-2">
                     <p className="text-sm font-medium truncate">{t.description}</p>
-                    <p className="text-xs text-muted-foreground">Vence {formatDate(t.due_date)}</p>
+                    {company && (
+                      <p className="text-xs text-muted-foreground flex items-center gap-1.5 mt-0.5">
+                        <span className="size-1.5 rounded-full shrink-0" style={{ background: company.color }} />
+                        <span className="truncate">{company.name}</span>
+                      </p>
+                    )}
+                    <p className="text-xs text-muted-foreground mt-0.5">Vence {formatDate(t.due_date)}</p>
                   </div>
                   <div className="text-right">
                     <p className="text-sm font-medium tabular">{formatBRL(t.amount)}</p>
