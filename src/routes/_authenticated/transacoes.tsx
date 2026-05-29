@@ -29,7 +29,7 @@ export const Route = createFileRoute("/_authenticated/transacoes")({
 });
 
 function TransacoesPage() {
-  const { selectedCompanyId, companies, canWrite, loading } = useAuth();
+  const { selectedCompanyId, companies, canWrite, loading, user } = useAuth();
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
   const [filterCompany, setFilterCompany] = useState("all");
@@ -41,6 +41,9 @@ function TransacoesPage() {
   const [filterMaxAmount, setFilterMaxAmount] = useState("");
   const [showFilters, setShowFilters] = useState(false);
   const [open, setOpen] = useState(false);
+  const [editData, setEditData] = useState<any>(null);
+  const [markPaidId, setMarkPaidId] = useState<string | null>(null);
+  const [markPaidDate, setMarkPaidDate] = useState<string>(todayISO());
 
   const filteredCompanies = companies.filter(c => {
     if (selectedCompanyId === "all_clinica") return c.kind === "clinica";
@@ -53,7 +56,10 @@ function TransacoesPage() {
   const { data: txs, isPending } = useQuery({
     queryKey: ["transactions", selectedCompanyId],
     queryFn: async () => {
-      let q = supabase.from("transactions").select("*").order("due_date", { ascending: false });
+      let q = supabase.from("transactions").select(`
+        *,
+        paid_by_profile:profiles!transactions_paid_by_fkey(full_name)
+      `).order("due_date", { ascending: false });
       q = applyCompanyFilter(q, selectedCompanyId, companies);
       const { data, error } = await q;
       if (error) throw error;
@@ -89,13 +95,15 @@ function TransacoesPage() {
     return true;
   });
 
-  const markPaid = async (id: string) => {
+  const submitMarkPaid = async () => {
+    if (!markPaidId) return;
     const { error } = await supabase
       .from("transactions")
-      .update({ status: "pago", paid_date: todayISO() })
-      .eq("id", id);
+      .update({ status: "pago", paid_date: markPaidDate, paid_by: user?.id })
+      .eq("id", markPaidId);
     if (error) return toast.error("Erro", { description: error.message });
     toast.success("Marcada como paga");
+    setMarkPaidId(null);
     qc.invalidateQueries({ queryKey: ["transactions"] });
     qc.invalidateQueries({ queryKey: ["tx"] });
   };
@@ -128,16 +136,34 @@ function TransacoesPage() {
         headerNode
       )}
 
+
+      {/* Mark Paid Dialog */}
+      <Dialog open={!!markPaidId} onOpenChange={(o) => !o && setMarkPaidId(null)}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader><DialogTitle>Confirmar pagamento</DialogTitle></DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Data do Pagamento</Label>
+              <DatePicker value={markPaidDate} onChange={(v) => setMarkPaidDate(v)} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setMarkPaidId(null)}>Cancelar</Button>
+            <Button onClick={submitMarkPaid}>Confirmar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Card>
         <CardHeader className="pb-3">
           <div className="flex flex-col sm:flex-row sm:items-center gap-3 w-full">
             <div className="flex gap-2 w-full sm:w-auto">
               {canWrite && (
-                <Dialog open={open} onOpenChange={setOpen}>
+                <Dialog open={open} onOpenChange={(o) => { setOpen(o); if(!o) setEditData(null); }}>
                   <DialogTrigger asChild>
-                    <Button className="flex-1 sm:flex-none"><Plus className="size-4 mr-1" /> Nova transação</Button>
+                    <Button className="flex-1 sm:flex-none" onClick={() => setEditData(null)}><Plus className="size-4 mr-1" /> Nova transação</Button>
                   </DialogTrigger>
-                  <TransactionDialog onClose={() => setOpen(false)} />
+                  <TransactionDialog initialData={editData} onClose={() => { setOpen(false); setEditData(null); }} />
                 </Dialog>
               )}
               <Button className="flex-1 sm:flex-none" variant={showFilters ? "secondary" : "outline"} onClick={() => setShowFilters(!showFilters)}>
@@ -240,10 +266,13 @@ function TransacoesPage() {
                   {canWrite && (
                     <div className="flex justify-end gap-2 mt-2 pt-2 border-t border-dashed border-border/50">
                       {t.status !== "pago" && (
-                        <Button size="sm" variant="secondary" className="h-7 text-xs bg-success/10 text-success hover:bg-success/20 border-none px-2" onClick={() => markPaid(t.id)}>
+                        <Button size="sm" variant="secondary" className="h-7 text-xs bg-success/10 text-success hover:bg-success/20 border-none px-2" onClick={() => { setMarkPaidId(t.id); setMarkPaidDate(todayISO()); }}>
                           <CheckCircle2 className="size-3 mr-1" /> Marcar Pago
                         </Button>
                       )}
+                      <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground" onClick={() => { setEditData(t); setOpen(true); }}>
+                        <Edit2 className="size-3" />
+                      </Button>
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
                           <Button size="sm" variant="ghost" className="h-7 text-xs text-destructive hover:bg-destructive/10 px-2">
@@ -316,7 +345,7 @@ function TransacoesPage() {
                         {canWrite && (
                           <div className="flex gap-1 justify-end">
                             {t.status !== "pago" && (
-                              <Button size="icon" variant="ghost" onClick={() => markPaid(t.id)} title="Marcar pago">
+                              <Button size="icon" variant="ghost" onClick={() => { setMarkPaidId(t.id); setMarkPaidDate(todayISO()); }} title="Marcar pago">
                                 <CheckCircle2 className="size-4 text-success" />
                               </Button>
                             )}
@@ -367,7 +396,7 @@ function TransacoesPage() {
   );
 }
 
-function TransactionDialog({ onClose }: { onClose: () => void }) {
+function TransactionDialog({ onClose, initialData }: { onClose: () => void; initialData?: any }) {
   const { companies, selectedCompanyId } = useAuth();
   const qc = useQueryClient();
 
@@ -387,19 +416,39 @@ function TransactionDialog({ onClose }: { onClose: () => void }) {
     return true;
   });
 
-  const [form, setForm] = useState({
-    company_id: getSelectedCompanyId(),
-    type: "saida" as "entrada" | "saida",
-    description: "",
-    amount: "",
-    due_date: todayISO(),
-    status: "pendente" as "pendente" | "pago",
-    category_id: "none",
-    cost_center_id: "none",
-    notes: "",
-    isInstallment: false,
-    installments: "2",
-    amountType: "total" as "total" | "parcela",
+  const [form, setForm] = useState(() => {
+    if (initialData) {
+      return {
+        company_id: initialData.company_id ?? getSelectedCompanyId(),
+        type: initialData.type ?? "saida",
+        description: initialData.description ?? "",
+        amount: initialData.amount ? maskBRL(Math.round(Number(initialData.amount) * 100).toString()) : "",
+        due_date: initialData.due_date ?? todayISO(),
+        status: initialData.status ?? "pendente",
+        category_id: initialData.category_id ?? "none",
+        cost_center_id: initialData.cost_center_id ?? "none",
+        notes: initialData.notes ?? "",
+        paid_date: initialData.paid_date ?? todayISO(),
+        isInstallment: false,
+        installments: "2",
+        amountType: "total" as "total" | "parcela",
+      };
+    }
+    return {
+      company_id: getSelectedCompanyId(),
+      type: "saida" as "entrada" | "saida",
+      description: "",
+      amount: "",
+      due_date: todayISO(),
+      status: "pendente" as "pendente" | "pago",
+      category_id: "none",
+      cost_center_id: "none",
+      notes: "",
+      paid_date: todayISO(),
+      isInstallment: false,
+      installments: "2",
+      amountType: "total" as "total" | "parcela",
+    };
   });
   const [saving, setSaving] = useState(false);
 
@@ -445,8 +494,26 @@ function TransactionDialog({ onClose }: { onClose: () => void }) {
 
     setSaving(true);
     
-    const payloads: any[] = [];
-    for (let i = 0; i < numInstallments; i++) {
+    if (initialData) {
+      const payload = {
+        company_id: form.company_id,
+        type: form.type,
+        description: form.description,
+        amount: baseAmount,
+        due_date: form.due_date,
+        status: form.status,
+        paid_date: form.status === "pago" ? form.paid_date : null,
+        category_id: form.category_id !== "none" ? form.category_id : null,
+        cost_center_id: form.cost_center_id !== "none" ? form.cost_center_id : null,
+        notes: form.notes || null,
+      };
+      const { error } = await supabase.from("transactions").update(payload).eq("id", initialData.id);
+      setSaving(false);
+      if (error) return toast.error("Erro", { description: error.message });
+      toast.success("Transação atualizada");
+    } else {
+      const payloads: any[] = [];
+      for (let i = 0; i < numInstallments; i++) {
       payloads.push({
         company_id: form.company_id,
         type: form.type,
@@ -461,10 +528,11 @@ function TransactionDialog({ onClose }: { onClose: () => void }) {
       });
     }
 
-    const { error } = await supabase.from("transactions").insert(payloads);
-    setSaving(false);
-    if (error) return toast.error("Erro", { description: error.message });
-    toast.success(form.isInstallment ? `${numInstallments} parcelas criadas` : "Transação criada");
+      const { error } = await supabase.from("transactions").insert(payloads);
+      setSaving(false);
+      if (error) return toast.error("Erro", { description: error.message });
+      toast.success(form.isInstallment ? `${numInstallments} parcelas criadas` : "Transação criada");
+    }
     qc.invalidateQueries({ queryKey: ["transactions"] });
     qc.invalidateQueries({ queryKey: ["tx"] });
     qc.invalidateQueries({ queryKey: ["pr"] });
@@ -546,18 +614,33 @@ function TransactionDialog({ onClose }: { onClose: () => void }) {
             <Label>Vencimento</Label>
             <DatePicker value={form.due_date} onChange={(v) => setForm({ ...form, due_date: v })} />
           </div>
+          {form.status === "pago" && (
+            <div className="space-y-1.5">
+              <Label>Data de Pagamento</Label>
+              <DatePicker value={form.paid_date} onChange={(v) => setForm({ ...form, paid_date: v })} />
+            </div>
+          )}
+          {form.status === "pago" && initialData?.paid_by_profile && (
+            <div className="col-span-1 sm:col-span-2 space-y-1.5 mt-2">
+              <Label className="text-muted-foreground text-xs block">
+                Baixa realizada por: <span className="font-medium text-foreground">{initialData.paid_by_profile.full_name}</span>
+              </Label>
+            </div>
+          )}
         </div>
         
-        <div className="flex items-center space-x-2 pt-1 pb-1">
-          <Checkbox 
-            id="isInstallment" 
-            checked={form.isInstallment} 
-            onCheckedChange={(c) => setForm({ ...form, isInstallment: c === true })} 
-          />
-          <label htmlFor="isInstallment" className="text-sm font-medium leading-none cursor-pointer">
-            Repetir / Parcelar transação
-          </label>
-        </div>
+        {!initialData && (
+          <div className="flex items-center space-x-2 pt-1 pb-1">
+            <Checkbox 
+              id="isInstallment" 
+              checked={form.isInstallment} 
+              onCheckedChange={(c) => setForm({ ...form, isInstallment: c === true })} 
+            />
+            <label htmlFor="isInstallment" className="text-sm font-medium leading-none cursor-pointer">
+              Repetir / Parcelar transação
+            </label>
+          </div>
+        )}
 
         {form.isInstallment && (
           <div className="p-3 bg-muted/40 rounded-md border space-y-3">
