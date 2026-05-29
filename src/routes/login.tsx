@@ -44,6 +44,8 @@ function LoginPage() {
         return;
       }
       toast.success("Bem-vindo de volta!");
+      // Explicit navigation to bypass useEffect delays on mobile
+      nav({ to: "/dashboard", replace: true });
     } catch (err: any) {
       toast.error("Erro inesperado", { description: err.message });
       console.error(err);
@@ -61,7 +63,7 @@ function LoginPage() {
     <div className="min-h-screen grid lg:grid-cols-2">
       <div className="hidden lg:flex flex-col justify-between p-12 bg-gradient-to-br from-primary/15 via-background to-background border-r">
         <div className="flex items-center gap-2 text-lg font-semibold">
-          <Wallet className="size-6 text-primary" /> Caixa
+          <Wallet className="size-6 text-primary" /> Gestão Financeira
         </div>
         <div>
           <h1 className="text-4xl font-semibold tracking-tight">
@@ -71,20 +73,26 @@ function LoginPage() {
             Fluxo de caixa, contas a pagar e a receber, dashboard consolidado — tudo num só lugar.
           </p>
         </div>
-        <div className="text-xs text-muted-foreground">© Caixa</div>
+        <div className="text-xs text-muted-foreground">© Gestão Financeira</div>
       </div>
 
       <div className="flex items-center justify-center p-6">
         <div className="w-full max-w-sm space-y-6">
           <div className="lg:hidden flex items-center gap-2 text-lg font-semibold">
-            <Wallet className="size-6 text-primary" /> Caixa
+            <Wallet className="size-6 text-primary" /> Gestão Financeira
           </div>
           <div>
             <h2 className="text-2xl font-semibold tracking-tight">Entrar</h2>
             <p className="text-sm text-muted-foreground mt-1">Use seu e-mail corporativo ou Google.</p>
           </div>
 
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <form 
+            onSubmit={(e) => {
+              e.preventDefault();
+              form.handleSubmit(onSubmit)(e);
+            }} 
+            className="space-y-4"
+          >
             <div className="space-y-1.5">
               <Label htmlFor="email">E-mail</Label>
               <Input id="email" type="email" autoComplete="email" {...form.register("email")} />

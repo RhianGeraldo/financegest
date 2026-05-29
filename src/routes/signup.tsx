@@ -71,7 +71,7 @@ function SignupPage() {
     <div className="min-h-screen grid lg:grid-cols-2">
       <div className="hidden lg:flex flex-col justify-between p-12 bg-gradient-to-br from-primary/15 via-background to-background border-r">
         <div className="flex items-center gap-2 text-lg font-semibold">
-          <Wallet className="size-6 text-primary" /> Caixa
+          <Wallet className="size-6 text-primary" /> Gestão Financeira
         </div>
         <div>
           <h1 className="text-4xl font-semibold tracking-tight">
@@ -81,7 +81,7 @@ function SignupPage() {
             O primeiro usuário cadastrado torna-se Super Admin e pode criar empresas e convidar a equipe.
           </p>
         </div>
-        <div className="text-xs text-muted-foreground">© Caixa</div>
+        <div className="text-xs text-muted-foreground">© Gestão Financeira</div>
       </div>
 
       <div className="flex items-center justify-center p-6">
@@ -91,7 +91,13 @@ function SignupPage() {
             <p className="text-sm text-muted-foreground mt-1">Use seu e-mail corporativo.</p>
           </div>
 
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <form 
+            onSubmit={(e) => {
+              e.preventDefault();
+              form.handleSubmit(onSubmit)(e);
+            }} 
+            className="space-y-4"
+          >
             <div className="space-y-1.5">
               <Label htmlFor="full_name">Nome completo</Label>
               <Input id="full_name" {...form.register("full_name")} />
