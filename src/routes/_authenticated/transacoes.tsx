@@ -205,7 +205,68 @@ function TransacoesPage() {
           )}
         </CardHeader>
         <CardContent className="p-0">
-          <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-240px)] w-full min-w-0">
+          {/* Mobile Card View */}
+          <div className="md:hidden flex flex-col max-h-[calc(100vh-240px)] overflow-y-auto">
+            {filtered.map((t) => {
+              const st = statusLabel(t.status, t.due_date);
+              const company = companies.find((c) => c.id === t.company_id);
+              return (
+                <div key={t.id} className="p-4 border-b last:border-0 hover:bg-accent/30 flex flex-col gap-2">
+                  <div className="flex justify-between items-start">
+                    <div className="min-w-0 pr-2">
+                      <p className="font-medium text-sm truncate">{t.description}</p>
+                      {company && (
+                        <p className="text-xs text-muted-foreground flex items-center gap-1.5 mt-0.5">
+                          <span className="size-1.5 rounded-full shrink-0" style={{ background: company.color }} />
+                          <span className="truncate">{company.name}</span>
+                        </p>
+                      )}
+                      <p className="text-xs text-muted-foreground mt-0.5">{formatDate(t.due_date)}</p>
+                    </div>
+                    <div className="text-right shrink-0 flex flex-col items-end">
+                      <p className={`text-sm font-semibold tabular ${t.type === "entrada" ? "text-success" : "text-destructive"}`}>
+                        {t.type === "entrada" ? "+" : "-"} {formatBRL(t.amount)}
+                      </p>
+                      <Badge variant={st === "pago" ? "default" : st === "atrasado" ? "destructive" : "secondary"} className="mt-1 text-[10px] leading-none px-1.5 py-0.5">
+                        {st}
+                      </Badge>
+                    </div>
+                  </div>
+                  {canWrite && (
+                    <div className="flex justify-end gap-2 mt-2 pt-2 border-t border-dashed border-border/50">
+                      {t.status !== "pago" && (
+                        <Button size="sm" variant="secondary" className="h-7 text-xs bg-success/10 text-success hover:bg-success/20 border-none px-2" onClick={() => markPaid(t.id)}>
+                          <CheckCircle2 className="size-3 mr-1" /> Marcar Pago
+                        </Button>
+                      )}
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button size="sm" variant="ghost" className="h-7 text-xs text-destructive hover:bg-destructive/10 px-2">
+                            <Trash2 className="size-3 mr-1" /> Excluir
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Excluir transação?</AlertDialogTitle>
+                            <AlertDialogDescription>Esta ação não pode ser desfeita. A transação será removida permanentemente.</AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => remove(t.id)}>Excluir</AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+            {isPending && <p className="p-6 text-center text-sm text-muted-foreground animate-pulse">Carregando transações...</p>}
+            {!isPending && filtered.length === 0 && <p className="p-6 text-center text-sm text-muted-foreground">Nenhuma transação encontrada.</p>}
+          </div>
+
+          {/* Desktop Table View */}
+          <div className="hidden md:block overflow-x-auto overflow-y-auto max-h-[calc(100vh-240px)] w-full min-w-0">
             <table className="w-full text-sm relative min-w-[700px]">
               <thead className="text-xs text-muted-foreground border-b sticky top-0 bg-card z-10 shadow-sm">
                 <tr className="text-left">
