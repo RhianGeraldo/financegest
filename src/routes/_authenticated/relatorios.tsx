@@ -142,8 +142,8 @@ function RelatoriosPage() {
         </TabsList>
 
         <TabsContent value="fluxo">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <Card className="min-w-0 overflow-hidden">
+            <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2">
               <CardTitle className="text-base font-medium">Fluxo Mensal (Realizado)</CardTitle>
               <div className="flex gap-2">
                 <Button variant="outline" size="sm" onClick={() => handleExportFlow('pdf')}>
@@ -154,8 +154,8 @@ function RelatoriosPage() {
                 </Button>
               </div>
             </CardHeader>
-            <CardContent>
-              <div className="h-[400px] mt-4">
+            <CardContent className="min-w-0">
+              <div className="h-[400px] mt-4 min-w-0">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={flowData}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
@@ -175,8 +175,8 @@ function RelatoriosPage() {
         </TabsContent>
 
         <TabsContent value="categorias">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <Card className="min-w-0 overflow-hidden">
+            <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2">
               <CardTitle className="text-base font-medium">Saídas Pagas por Categoria</CardTitle>
               <div className="flex gap-2">
                 <Button variant="outline" size="sm" onClick={() => handleExportCat('pdf')}>
@@ -187,8 +187,8 @@ function RelatoriosPage() {
                 </Button>
               </div>
             </CardHeader>
-            <CardContent>
-              <div className="h-[400px] mt-4">
+            <CardContent className="min-w-0">
+              <div className="h-[400px] mt-4 min-w-0">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={catData} layout="vertical" margin={{ left: 50 }}>
                     <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="var(--border)" />

@@ -165,11 +165,11 @@ function DashboardPage() {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
+        <Card className="lg:col-span-2 min-w-0 overflow-hidden">
           <CardHeader>
             <CardTitle className="text-base">Fluxo de caixa — últimos 6 meses</CardTitle>
           </CardHeader>
-          <CardContent className="h-72">
+          <CardContent className="h-72 min-w-0">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={months}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
@@ -186,11 +186,11 @@ function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="min-w-0 overflow-hidden">
           <CardHeader>
             <CardTitle className="text-base">Despesas por categoria (mês)</CardTitle>
           </CardHeader>
-          <CardContent className="h-72">
+          <CardContent className="h-72 min-w-0">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie

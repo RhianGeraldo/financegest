@@ -125,32 +125,34 @@ function TransacoesPage() {
 
       <Card>
         <CardHeader className="pb-3">
-          <div className="flex items-center gap-3 w-full">
-            {canWrite && (
-              <Dialog open={open} onOpenChange={setOpen}>
-                <DialogTrigger asChild>
-                  <Button><Plus className="size-4 mr-1" /> Nova transação</Button>
-                </DialogTrigger>
-                <TransactionDialog onClose={() => setOpen(false)} />
-              </Dialog>
-            )}
-            <div className="relative flex-1 max-w-sm">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3 w-full">
+            <div className="flex gap-2 w-full sm:w-auto">
+              {canWrite && (
+                <Dialog open={open} onOpenChange={setOpen}>
+                  <DialogTrigger asChild>
+                    <Button className="flex-1 sm:flex-none"><Plus className="size-4 mr-1" /> Nova transação</Button>
+                  </DialogTrigger>
+                  <TransactionDialog onClose={() => setOpen(false)} />
+                </Dialog>
+              )}
+              <Button className="flex-1 sm:flex-none" variant={showFilters ? "secondary" : "outline"} onClick={() => setShowFilters(!showFilters)}>
+                <Filter className="size-4 mr-2" />
+                Filtros
+              </Button>
+            </div>
+            <div className="relative flex-1 w-full sm:max-w-sm">
               <Search className="size-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
               <Input
                 placeholder="Buscar descrição…"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="pl-9"
+                className="pl-9 w-full"
               />
             </div>
-            <Button variant={showFilters ? "secondary" : "outline"} onClick={() => setShowFilters(!showFilters)}>
-              <Filter className="size-4 mr-2" />
-              Filtros Avançados
-            </Button>
           </div>
 
           {showFilters && (
-            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 mt-4 pt-4 border-t">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 mt-4 pt-4 border-t">
               <div className="space-y-1.5">
                 <Label className="text-xs">Empresa</Label>
                 <Select value={filterCompany} onValueChange={setFilterCompany}>
@@ -203,8 +205,8 @@ function TransacoesPage() {
           )}
         </CardHeader>
         <CardContent className="p-0">
-          <div className="overflow-auto max-h-[calc(100vh-240px)]">
-            <table className="w-full text-sm relative">
+          <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-240px)] w-full min-w-0">
+            <table className="w-full text-sm relative min-w-[700px]">
               <thead className="text-xs text-muted-foreground border-b sticky top-0 bg-card z-10 shadow-sm">
                 <tr className="text-left">
                   <th className="py-2 px-2">Descrição</th>
@@ -416,7 +418,7 @@ function TransactionDialog({ onClose }: { onClose: () => void }) {
             </SelectContent>
           </Select>
         </div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="space-y-1.5">
             <Label>Tipo</Label>
             <Select value={form.type} onValueChange={(v: "entrada"|"saida") => setForm({ ...form, type: v })}>
@@ -438,7 +440,7 @@ function TransactionDialog({ onClose }: { onClose: () => void }) {
             </Select>
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="space-y-1.5">
             <Label>Categoria</Label>
             <Select value={form.category_id} onValueChange={(v) => setForm({ ...form, category_id: v })}>
@@ -464,7 +466,7 @@ function TransactionDialog({ onClose }: { onClose: () => void }) {
           <Label>Descrição</Label>
           <Input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
         </div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="space-y-1.5">
             <Label>Valor (R$)</Label>
             <Input
