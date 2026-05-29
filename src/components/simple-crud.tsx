@@ -11,8 +11,9 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, Trash2, Edit2 } from "lucide-react";
+import { Plus, Trash2, Edit2, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 
 type Field =
@@ -334,23 +335,35 @@ function CrudDialog({ table, queryKey, fields, initialData, onClose, companyMode
       <DialogHeader><DialogTitle>{initialData ? "Editar registro" : "Novo registro"}</DialogTitle></DialogHeader>
       <div className="space-y-3">
         {companyMode === "multiple" ? (
-          <div className="space-y-2">
-            <Label>Empresas disponíveis</Label>
-            <div className="flex flex-col gap-2 border rounded-md p-3 max-h-[200px] overflow-auto">
-              {filteredCompanies.map((c) => (
-                <label key={c.id} className="flex items-center gap-2 text-sm cursor-pointer hover:bg-accent/50 p-1.5 rounded-md -mx-1.5 transition-colors">
-                  <Checkbox 
-                    checked={companyIds.includes(c.id)} 
-                    onCheckedChange={(checked) => {
-                      if (checked) setCompanyIds([...companyIds, c.id]);
-                      else setCompanyIds(companyIds.filter(id => id !== c.id));
-                    }}
-                  />
-                  <span className="size-2 rounded-full shrink-0" style={{ background: c.color }} />
-                  {c.name}
-                </label>
-              ))}
-            </div>
+          <div className="space-y-1.5">
+            <Label>Empresas</Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="w-full justify-between font-normal text-left h-10 px-3">
+                  <span className="truncate">
+                    {companyIds.length === 0 ? "Selecione as empresas..." : `${companyIds.length} empresa(s) selecionada(s)`}
+                  </span>
+                  <ChevronDown className="h-4 w-4 opacity-50 shrink-0" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[--radix-popover-trigger-width] p-3 max-h-[250px] overflow-auto">
+                <div className="flex flex-col gap-2">
+                  {filteredCompanies.map((c) => (
+                    <label key={c.id} className="flex items-center gap-2 text-sm cursor-pointer hover:bg-accent/50 p-1.5 rounded-md -mx-1.5 transition-colors">
+                      <Checkbox 
+                        checked={companyIds.includes(c.id)} 
+                        onCheckedChange={(checked) => {
+                          if (checked) setCompanyIds([...companyIds, c.id]);
+                          else setCompanyIds(companyIds.filter(id => id !== c.id));
+                        }}
+                      />
+                      <span className="size-2 rounded-full shrink-0" style={{ background: c.color }} />
+                      {c.name}
+                    </label>
+                  ))}
+                </div>
+              </PopoverContent>
+            </Popover>
           </div>
         ) : (
           <div className="space-y-1.5">
