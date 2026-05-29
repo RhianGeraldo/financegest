@@ -351,6 +351,9 @@ function TransacoesPage() {
                                 <CheckCircle2 className="size-4 text-success" />
                               </Button>
                             )}
+                            <Button size="icon" variant="ghost" onClick={() => { setEditData(t); setOpen(true); }} title="Editar">
+                              <Edit2 className="size-4 text-muted-foreground" />
+                            </Button>
                             <AlertDialog>
                               <AlertDialogTrigger asChild>
                                 <Button size="icon" variant="ghost">
