@@ -133,7 +133,7 @@ function EmpresasPage() {
           )}
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild><Button><Plus className="size-4 mr-1" /> Nova empresa</Button></DialogTrigger>
-            <NewCompanyDialog onClose={() => setOpen(false)} />
+            {open && <NewCompanyDialog onClose={() => setOpen(false)} />}
           </Dialog>
         </div>
       </div>

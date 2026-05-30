@@ -57,7 +57,7 @@ function CentrosCustoPage() {
     qc.invalidateQueries({ queryKey: ["categories"] });
   };
 
-  const handleCreateCat = (ccId: string) => { setEditCat({ cost_center_id: ccId }); setOpenCat(true); };
+  const handleCreateCat = (ccId: string) => { setEditCat({ cost_center_ids: [ccId] }); setOpenCat(true); };
   const handleEditCat = (cat: any) => { setEditCat(cat); setOpenCat(true); };
   const removeCat = async (id: string) => {
     const { error } = await supabase.from("categories").delete().eq("id", id);
@@ -69,7 +69,7 @@ function CentrosCustoPage() {
   const ccFields = [{ name: "name", label: "Nome", type: "text" as const, required: true }];
   const catFields = [
     { name: "name", label: "Nome", type: "text" as const, required: true },
-    { name: "cost_center_id", label: "Centro de Custo", type: "select" as const, required: true, options: (costCenters ?? []).map(c => ({ value: c.id, label: c.name })) },
+    { name: "cost_center_ids", label: "Centros de Custo", type: "multiselect" as const, required: true, options: (costCenters ?? []).map(c => ({ value: c.id, label: c.name })) },
     { name: "color", label: "Cor de identificação", type: "color" as const, required: true },
   ];
 
@@ -95,7 +95,7 @@ function CentrosCustoPage() {
         <CardContent className="p-0">
           <Accordion type="multiple" className="w-full">
             {(costCenters ?? []).map((cc) => {
-              const cats = (categories ?? []).filter(c => c.cost_center_id === cc.id);
+              const cats = (categories ?? []).filter(c => (c.cost_center_ids || []).includes(cc.id));
               return (
                 <AccordionItem key={cc.id} value={cc.id} className="border-b px-4">
                   <AccordionTrigger className="hover:no-underline py-4">

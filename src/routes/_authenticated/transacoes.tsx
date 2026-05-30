@@ -160,7 +160,7 @@ function TransacoesPage() {
                   <DialogTrigger asChild>
                     <Button className="flex-1 sm:flex-none" onClick={() => setEditData(null)}><Plus className="size-4 mr-1" /> Nova transação</Button>
                   </DialogTrigger>
-                  <TransactionDialog initialData={editData} onClose={() => { setOpen(false); setEditData(null); }} />
+                  {open && <TransactionDialog initialData={editData} onClose={() => { setOpen(false); setEditData(null); }} />}
                 </Dialog>
               )}
               <Button className="flex-1 sm:flex-none" variant={showFilters ? "secondary" : "outline"} onClick={() => setShowFilters(!showFilters)}>
@@ -497,7 +497,7 @@ function TransactionDialog({ onClose, initialData }: { onClose: () => void; init
     queryKey: ["categories", form.company_id, form.cost_center_id],
     queryFn: async () => {
       if (!form.company_id || !form.cost_center_id) return [];
-      const { data, error } = await supabase.from("categories").select("id, name").contains("company_ids", [form.company_id]).eq("cost_center_id", form.cost_center_id);
+      const { data, error } = await supabase.from("categories").select("id, name").contains("company_ids", [form.company_id]).contains("cost_center_ids", [form.cost_center_id]);
       if (error) throw error;
       return data ?? [];
     },

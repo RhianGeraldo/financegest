@@ -32,12 +32,12 @@ function CategoriasPage() {
       queryKey="categories"
       fields={[
         { name: "name", label: "Nome", type: "text", required: true },
-        { name: "cost_center_id", label: "Centro de Custo", type: "select", required: true, options: costCenterOptions },
+        { name: "cost_center_ids", label: "Centros de Custo", type: "multiselect", required: true, options: costCenterOptions },
         { name: "color", label: "Cor de identificação", type: "color", required: true },
       ]}
       columns={[
         { key: "name", label: "Nome" },
-        { key: "cost_center_id", label: "Centro de Custo", format: "select" },
+        { key: "cost_center_ids", label: "Centros de Custo", format: "multiselect" },
         { key: "color", label: "Cor", format: "color" },
       ]}
       companyMode="multiple"

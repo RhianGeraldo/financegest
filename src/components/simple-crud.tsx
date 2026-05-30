@@ -18,9 +18,9 @@ import { toast } from "sonner";
 
 export type Field =
   | { name: string; label: string; type: "text" | "money" | "color"; required?: boolean }
-  | { name: string; label: string; type: "select"; required?: boolean; options: { value: string; label: string }[] };
+  | { name: string; label: string; type: "select" | "multiselect"; required?: boolean; options: { value: string; label: string }[] };
 
-type Column = { key: string; label: string; format?: "money" | "color" | "select"; align?: "right" };
+type Column = { key: string; label: string; format?: "money" | "color" | "select" | "multiselect"; align?: "right" };
 
 interface Props {
   title: string;
@@ -41,6 +41,12 @@ export function SimpleCrudPage({ title, table, queryKey, fields, columns, compan
     const field = fields.find((f) => f.name === key);
     if (field?.type === "select" && field.options) {
       return field.options.find((o) => o.value === value)?.label ?? value;
+    }
+    if (field?.type === "multiselect" && field.options) {
+      if (Array.isArray(value)) {
+        return value.map(v => field.options.find((o) => o.value === v)?.label ?? v).join(", ");
+      }
+      return value;
     }
     return String(value ?? "");
   };
@@ -99,7 +105,7 @@ export function SimpleCrudPage({ title, table, queryKey, fields, columns, compan
           {canWrite && (
             <Dialog open={open} onOpenChange={setOpen}>
               <DialogTrigger asChild><Button size="sm" onClick={handleCreate}><Plus className="size-4 mr-1" /> Novo</Button></DialogTrigger>
-              <CrudDialog table={table} queryKey={queryKey} fields={fields} initialData={editData} onClose={() => setOpen(false)} companyMode={companyMode} />
+              {open && <CrudDialog table={table} queryKey={queryKey} fields={fields} initialData={editData} onClose={() => setOpen(false)} companyMode={companyMode} />}
             </Dialog>
           )}
         </>,
@@ -136,8 +142,8 @@ export function SimpleCrudPage({ title, table, queryKey, fields, columns, compan
                           <span className="size-3 rounded-full shadow-sm" style={{ background: row[c.key] }} />
                           <span className="text-muted-foreground text-xs">{row[c.key]}</span>
                         </div>
-                      ) : c.format === "select" ? (
-                        <span className="font-medium">{getSelectLabel(c.key, row[c.key])}</span>
+                      ) : c.format === "select" || c.format === "multiselect" ? (
+                        <span className="font-medium text-right max-w-[200px] truncate">{getSelectLabel(c.key, row[c.key])}</span>
                       ) : (
                         <span className="font-medium">{String(row[c.key] ?? "")}</span>
                       )}
@@ -213,8 +219,10 @@ export function SimpleCrudPage({ title, table, queryKey, fields, columns, compan
                             <span className="size-3 rounded-full shadow-sm" style={{ background: row[c.key] }} />
                             <span className="text-muted-foreground text-xs">{row[c.key]}</span>
                           </div>
-                        ) : c.format === "select" ? (
-                          getSelectLabel(c.key, row[c.key])
+                        ) : c.format === "select" || c.format === "multiselect" ? (
+                          <div className="max-w-[200px] truncate" title={getSelectLabel(c.key, row[c.key])}>
+                            {getSelectLabel(c.key, row[c.key])}
+                          </div>
                         ) : (
                           String(row[c.key] ?? "")
                         )}
@@ -291,22 +299,36 @@ export function CrudDialog({ table, queryKey, fields, initialData, onClose, comp
     setCompanyId(initialData?.company_id ?? getSelectedCompanyId());
     setCompanyIds(initialData?.company_ids ?? [getSelectedCompanyId()]);
     
-    if (!initialData) {
-      const initNew: Record<string, string> = {};
+    const isEdit = initialData && initialData.id;
+
+    if (!isEdit) {
+      const initNew: Record<string, any> = {};
       for (const f of fields) {
         if (f.type === "color") initNew[f.name] = "#6366f1";
         if (f.type === "select" && f.options?.[0]) initNew[f.name] = f.options[0].value;
+        if (f.type === "multiselect") initNew[f.name] = [];
+      }
+      if (initialData) {
+        for (const f of fields) {
+          if (initialData[f.name] !== undefined && initialData[f.name] !== null) {
+            initNew[f.name] = f.type === "multiselect" ? (Array.isArray(initialData[f.name]) ? initialData[f.name] : [initialData[f.name]]) : String(initialData[f.name]);
+          }
+        }
       }
       setValues(initNew);
       return;
     }
     
-    const init: Record<string, string> = {};
+    const init: Record<string, any> = {};
     for (const f of fields) {
       if (initialData[f.name] !== undefined && initialData[f.name] !== null) {
-        init[f.name] = f.type === "money" 
-          ? maskBRL(Math.round(Number(initialData[f.name]) * 100).toString()) 
-          : String(initialData[f.name]);
+        if (f.type === "multiselect") {
+          init[f.name] = Array.isArray(initialData[f.name]) ? initialData[f.name] : [];
+        } else {
+          init[f.name] = f.type === "money" 
+            ? maskBRL(Math.round(Number(initialData[f.name]) * 100).toString()) 
+            : String(initialData[f.name]);
+        }
       }
     }
     setValues(init);
@@ -321,13 +343,18 @@ export function CrudDialog({ table, queryKey, fields, initialData, onClose, comp
     const payload: any = companyMode === "multiple" ? { company_ids: companyIds } : { company_id: companyId };
     for (const f of fields) {
       const v = values[f.name];
-      if (f.required && !v) return toast.error(`${f.label} é obrigatório`);
-      payload[f.name] = f.type === "money" ? parseBRL(v ?? "") : v ?? "";
+      if (f.required && (v === undefined || v === "" || (Array.isArray(v) && v.length === 0))) return toast.error(`${f.label} é obrigatório`);
+      if (f.type === "multiselect") {
+        payload[f.name] = Array.isArray(v) ? v : [];
+      } else {
+        payload[f.name] = f.type === "money" ? parseBRL(v ?? "") : v ?? "";
+      }
     }
     setSaving(true);
     
     let error;
-    if (initialData) {
+    const isEdit = initialData && initialData.id;
+    if (isEdit) {
       const res = await supabase.from(table as any).update(payload).eq("id", initialData.id);
       error = res.error;
     } else {
@@ -337,14 +364,14 @@ export function CrudDialog({ table, queryKey, fields, initialData, onClose, comp
     
     setSaving(false);
     if (error) return toast.error("Erro", { description: error.message });
-    toast.success(initialData ? "Atualizado" : "Criado");
+    toast.success(isEdit ? "Atualizado" : "Criado");
     qc.invalidateQueries({ queryKey: [queryKey] });
     onClose();
   };
 
   return (
     <DialogContent>
-      <DialogHeader><DialogTitle>{initialData ? "Editar registro" : "Novo registro"}</DialogTitle></DialogHeader>
+      <DialogHeader><DialogTitle>{initialData && initialData.id ? "Editar registro" : "Novo registro"}</DialogTitle></DialogHeader>
       <div className="space-y-3">
         {companyMode === "multiple" ? (
           <div className="space-y-1.5">
@@ -398,6 +425,34 @@ export function CrudDialog({ table, queryKey, fields, initialData, onClose, comp
                   {f.options.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
                 </SelectContent>
               </Select>
+            ) : f.type === "multiselect" ? (
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="w-full justify-between font-normal text-left h-10 px-3">
+                    <span className="truncate">
+                      {!values[f.name] || values[f.name].length === 0 ? "Selecione..." : `${values[f.name].length} selecionado(s)`}
+                    </span>
+                    <ChevronDown className="h-4 w-4 opacity-50 shrink-0" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[--radix-popover-trigger-width] p-3 max-h-[250px] overflow-auto">
+                  <div className="flex flex-col gap-2">
+                    {f.options.map((o) => (
+                      <label key={o.value} className="flex items-center gap-2 text-sm cursor-pointer hover:bg-accent/50 p-1.5 rounded-md -mx-1.5 transition-colors">
+                        <Checkbox 
+                          checked={(values[f.name] || []).includes(o.value)} 
+                          onCheckedChange={(checked) => {
+                            const current = values[f.name] || [];
+                            if (checked) setValues({ ...values, [f.name]: [...current, o.value] });
+                            else setValues({ ...values, [f.name]: current.filter((v: any) => v !== o.value) });
+                          }}
+                        />
+                        {o.label}
+                      </label>
+                    ))}
+                  </div>
+                </PopoverContent>
+              </Popover>
             ) : f.type === "money" ? (
               <Input
                 inputMode="numeric"

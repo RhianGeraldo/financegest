@@ -59,6 +59,7 @@ export type Database = {
         Row: {
           color: string
           company_id: string
+          cost_center_ids?: string[] | null
           created_at: string
           id: string
           kind: Database["public"]["Enums"]["category_kind"]
@@ -67,6 +68,7 @@ export type Database = {
         Insert: {
           color?: string
           company_id: string
+          cost_center_ids?: string[] | null
           created_at?: string
           id?: string
           kind: Database["public"]["Enums"]["category_kind"]
@@ -75,6 +77,7 @@ export type Database = {
         Update: {
           color?: string
           company_id?: string
+          cost_center_ids?: string[] | null
           created_at?: string
           id?: string
           kind?: Database["public"]["Enums"]["category_kind"]
