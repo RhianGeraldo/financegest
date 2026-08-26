@@ -54,6 +54,14 @@ export function isOverdue(dueDate: string, status: string): boolean {
   return new Date(dueDate + "T00:00:00") < new Date(new Date().toDateString());
 }
 
+export function getDaysOverdue(dueDate: string): number {
+  const today = new Date(new Date().toDateString());
+  const due = new Date(dueDate + "T00:00:00");
+  const diffTime = today.getTime() - due.getTime();
+  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+  return Math.max(0, diffDays);
+}
+
 export function statusLabel(status: string, dueDate: string): "pago" | "atrasado" | "pendente" {
   if (status === "pago") return "pago";
   return isOverdue(dueDate, status) ? "atrasado" : "pendente";

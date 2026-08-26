@@ -221,7 +221,9 @@ export type Database = {
           due_date: string
           id: string
           notes: string | null
+          paid_by: string | null
           paid_date: string | null
+          receipt_url: string | null
           status: Database["public"]["Enums"]["tx_status"]
           type: Database["public"]["Enums"]["tx_type"]
           updated_at: string
@@ -238,9 +240,11 @@ export type Database = {
           due_date: string
           id?: string
           notes?: string | null
+          paid_by?: string | null
           paid_date?: string | null
+          receipt_url?: string | null
           status?: Database["public"]["Enums"]["tx_status"]
-          type: Database["public"]["Enums"]["tx_type"]
+          type?: Database["public"]["Enums"]["tx_type"]
           updated_at?: string
         }
         Update: {
@@ -255,7 +259,9 @@ export type Database = {
           due_date?: string
           id?: string
           notes?: string | null
+          paid_by?: string | null
           paid_date?: string | null
+          receipt_url?: string | null
           status?: Database["public"]["Enums"]["tx_status"]
           type?: Database["public"]["Enums"]["tx_type"]
           updated_at?: string

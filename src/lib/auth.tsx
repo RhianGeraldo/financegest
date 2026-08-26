@@ -73,7 +73,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function loadUserScope(userId: string) {
     try {
-      const fetchPromise = Promise.all([
+      const [rolesRes, compRes] = await Promise.all([
         supabase.from("user_roles").select("role").eq("user_id", userId),
         supabase
           .from("companies")
@@ -81,17 +81,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           .eq("active", true)
           .order("name"),
       ]);
-      
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error("Supabase timeout! O banco demorou mais de 5s para responder.")), 5000)
-      );
 
-      const [rolesRes, compRes] = await Promise.race([fetchPromise, timeoutPromise]) as any;
+      if (rolesRes.error) console.error("Erro ao carregar roles:", rolesRes.error.message);
+      if (compRes.error) console.error("Erro ao carregar empresas:", compRes.error.message);
 
       setRoles((rolesRes.data?.map((r: any) => r.role as AppRole)) ?? []);
       setCompanies((compRes.data as Company[]) ?? []);
     } catch (e: any) {
-      console.error("Erro fatal no loadUserScope:", e.message || e);
+      console.error("Erro no loadUserScope:", e.message || e);
     }
   }
 
@@ -107,25 +104,46 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   useEffect(() => {
-    // ÚNICO listener — onAuthStateChange dispara INITIAL_SESSION também.
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, sess) => {
+    let mounted = true;
+
+    async function initAuth() {
       try {
-        setSession(sess);
-        if (sess?.user) {
-          await loadUserScope(sess.user.id);
+        const { data } = await supabase.auth.getSession();
+        if (!mounted) return;
+        setSession(data.session);
+        if (data.session?.user) {
+          await loadUserScope(data.session.user.id);
         } else {
           setRoles([]);
           setCompanies([]);
         }
-      } catch (err) {
-        console.error("Erro ao carregar escopo de usuário:", err);
+      } catch (e) {
+        console.error("Erro na inicialização de autenticação:", e);
       } finally {
-        setLoading(false);
+        if (mounted) {
+          setLoading(false);
+        }
+      }
+    }
+
+    initAuth();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, sess) => {
+      setSession(sess);
+      if (sess?.user) {
+        loadUserScope(sess.user.id);
+      } else {
+        setRoles([]);
+        setCompanies([]);
       }
     });
-    return () => subscription.unsubscribe();
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const hasRole = (r: AppRole) => roles.includes(r);

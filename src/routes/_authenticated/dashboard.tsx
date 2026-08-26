@@ -2,9 +2,10 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth, applyCompanyFilter } from "@/lib/auth";
-import { formatBRL, statusLabel, formatDate } from "@/lib/format";
+import { formatBRL, statusLabel, formatDate, getDaysOverdue, todayISO } from "@/lib/format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Link } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
@@ -40,13 +41,12 @@ function DashboardPage() {
   const { selectedCompanyId, companies, loading } = useAuth();
 
   const { data: tx, isPending: txLoading } = useQuery({
-    queryKey: ["tx", selectedCompanyId],
+    queryKey: ["transactions", selectedCompanyId, companies.map(c => c.id).join(",")],
     queryFn: async () => {
       let q = supabase
         .from("transactions")
-        .select("id, amount, type, status, due_date, paid_date, category_id, description, company_id")
-        .order("due_date", { ascending: false })
-        .limit(500);
+        .select("id, company_id, type, description, amount, category_id, cost_center_id, bank_account_id, due_date, paid_date, status, notes, created_by, paid_by, receipt_url, created_at")
+        .order("due_date", { ascending: false });
       q = applyCompanyFilter(q, selectedCompanyId, companies);
       const { data, error } = await q;
       if (error) throw error;
@@ -56,7 +56,7 @@ function DashboardPage() {
   });
 
   const { data: banks, isPending: banksLoading } = useQuery({
-    queryKey: ["banks", selectedCompanyId],
+    queryKey: ["banks", selectedCompanyId, companies.map(c => c.id).join(",")],
     queryFn: async () => {
       let q = supabase.from("bank_accounts").select("initial_balance");
       q = applyCompanyFilter(q, selectedCompanyId, companies);
@@ -101,10 +101,21 @@ function DashboardPage() {
   }
 
   const recent = txs.slice(0, 6);
-  const upcoming = txs
-    .filter((t) => t.status === "pendente")
-    .sort((a, b) => a.due_date.localeCompare(b.due_date))
-    .slice(0, 6);
+  
+  const today = todayISO();
+  const pendingTxs = txs.filter((t) => t.status === "pendente");
+
+  const vencidos = pendingTxs
+    .filter((t) => t.due_date < today)
+    .sort((a, b) => a.due_date.localeCompare(b.due_date));
+
+  const aVencerHoje = pendingTxs
+    .filter((t) => t.due_date === today)
+    .sort((a, b) => a.due_date.localeCompare(b.due_date));
+
+  const aVencerFuturo = pendingTxs
+    .filter((t) => t.due_date > today)
+    .sort((a, b) => a.due_date.localeCompare(b.due_date));
 
   const stats = [
     { label: "Saldo total", value: formatBRL(saldoTotal), icon: Wallet, accent: "text-primary" },
@@ -219,18 +230,18 @@ function DashboardPage() {
         </Card>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
+      <div className="grid gap-4 lg:grid-cols-2 items-stretch">
+        <Card className="flex flex-col h-full">
           <CardHeader>
-            <CardTitle className="text-base">Últimas transações</CardTitle>
+            <CardTitle className="text-base font-semibold">Últimas transações</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-2">
+          <CardContent className="flex-1 space-y-2 overflow-y-auto max-h-[480px]">
             {recent.length === 0 && <p className="text-sm text-muted-foreground py-6 text-center">Sem transações ainda.</p>}
             {recent.map((t) => {
               const st = statusLabel(t.status, t.due_date);
               const company = companies.find((c) => c.id === t.company_id);
               return (
-                <div key={t.id} className="flex items-center justify-between py-2 border-b last:border-0">
+                <Link key={t.id} to="/transacoes" search={{ editId: t.id }} className="flex items-center justify-between py-2 border-b last:border-0 hover:bg-accent/20 px-1 rounded transition-colors cursor-pointer">
                   <div className="min-w-0 pr-2">
                     <p className="text-sm font-medium truncate">{t.description}</p>
                     {company && (
@@ -241,7 +252,7 @@ function DashboardPage() {
                     )}
                     <p className="text-xs text-muted-foreground mt-0.5">{formatDate(t.due_date)}</p>
                   </div>
-                  <div className="text-right">
+                  <div className="text-right shrink-0">
                     <p className={`text-sm font-medium tabular ${t.type === "entrada" ? "text-success" : "text-destructive"}`}>
                       {t.type === "entrada" ? "+" : "-"} {formatBRL(t.amount)}
                     </p>
@@ -249,43 +260,130 @@ function DashboardPage() {
                       {st}
                     </Badge>
                   </div>
-                </div>
+                </Link>
               );
             })}
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Próximos vencimentos</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {upcoming.length === 0 && <p className="text-sm text-muted-foreground py-6 text-center">Nada pendente.</p>}
-            {upcoming.map((t) => {
-              const st = statusLabel(t.status, t.due_date);
-              const company = companies.find((c) => c.id === t.company_id);
-              return (
-                <div key={t.id} className="flex items-center justify-between py-2 border-b last:border-0">
-                  <div className="min-w-0 pr-2">
-                    <p className="text-sm font-medium truncate">{t.description}</p>
-                    {company && (
-                      <p className="text-xs text-muted-foreground flex items-center gap-1.5 mt-0.5">
-                        <span className="size-1.5 rounded-full shrink-0" style={{ background: company.color }} />
-                        <span className="truncate">{company.name}</span>
-                      </p>
-                    )}
-                    <p className="text-xs text-muted-foreground mt-0.5">Vence {formatDate(t.due_date)}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm font-medium tabular">{formatBRL(t.amount)}</p>
-                    <Badge variant={st === "atrasado" ? "destructive" : "secondary"} className="text-[10px]">
-                      {st}
-                    </Badge>
-                  </div>
-                </div>
-              );
-            })}
-          </CardContent>
+        <Card className="flex flex-col h-full">
+          <Tabs defaultValue={vencidos.length > 0 ? "vencidos" : aVencerHoje.length > 0 ? "hoje" : "a_vencer"} className="flex flex-col h-full">
+            <CardHeader className="pb-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <CardTitle className="text-base font-semibold whitespace-nowrap shrink-0">Próximos vencimentos</CardTitle>
+                <TabsList className="h-8 p-1 w-full sm:w-auto overflow-x-auto justify-start sm:justify-center shrink-0">
+                  <TabsTrigger value="vencidos" className="text-xs px-2.5 h-6 shrink-0">
+                    Vencidos ({vencidos.length})
+                  </TabsTrigger>
+                  <TabsTrigger value="hoje" className="text-xs px-2.5 h-6 shrink-0">
+                    A vencer hoje ({aVencerHoje.length})
+                  </TabsTrigger>
+                  <TabsTrigger value="a_vencer" className="text-xs px-2.5 h-6 shrink-0">
+                    A vencer ({aVencerFuturo.length})
+                  </TabsTrigger>
+                </TabsList>
+              </div>
+            </CardHeader>
+
+            <CardContent className="pt-2 flex-1 overflow-y-auto min-h-[480px] sm:min-h-[360px] max-h-[580px] sm:max-h-[480px] pr-1">
+              <TabsContent value="vencidos" className="mt-0 space-y-2">
+                {vencidos.length === 0 ? (
+                  <p className="text-sm text-muted-foreground py-8 text-center">Nenhum título vencido.</p>
+                ) : (
+                  vencidos.map((t) => {
+                    const daysOverdue = getDaysOverdue(t.due_date);
+                    const company = companies.find((c) => c.id === t.company_id);
+                    return (
+                      <Link key={t.id} to="/transacoes" search={{ editId: t.id }} className="flex items-center justify-between py-2 border-b last:border-0 hover:bg-accent/20 px-1 rounded transition-colors cursor-pointer">
+                        <div className="min-w-0 pr-2">
+                          <p className="text-sm font-medium truncate">{t.description}</p>
+                          {company && (
+                            <p className="text-xs text-muted-foreground flex items-center gap-1.5 mt-0.5">
+                              <span className="size-1.5 rounded-full shrink-0" style={{ background: company.color }} />
+                              <span className="truncate">{company.name}</span>
+                            </p>
+                          )}
+                          <p className="text-xs text-destructive font-medium mt-0.5">
+                            Venceu {formatDate(t.due_date)} • {daysOverdue} {daysOverdue === 1 ? "dia" : "dias"} em atraso
+                          </p>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <p className="text-sm font-medium tabular">{formatBRL(t.amount)}</p>
+                          <Badge variant="destructive" className="text-[10px] mt-0.5">
+                            atrasado
+                          </Badge>
+                        </div>
+                      </Link>
+                    );
+                  })
+                )}
+              </TabsContent>
+
+              <TabsContent value="hoje" className="mt-0 space-y-2">
+                {aVencerHoje.length === 0 ? (
+                  <p className="text-sm text-muted-foreground py-8 text-center">Nenhum título a vencer hoje.</p>
+                ) : (
+                  aVencerHoje.map((t) => {
+                    const company = companies.find((c) => c.id === t.company_id);
+                    return (
+                      <Link key={t.id} to="/transacoes" search={{ editId: t.id }} className="flex items-center justify-between py-2 border-b last:border-0 hover:bg-accent/20 px-1 rounded transition-colors cursor-pointer">
+                        <div className="min-w-0 pr-2">
+                          <p className="text-sm font-medium truncate">{t.description}</p>
+                          {company && (
+                            <p className="text-xs text-muted-foreground flex items-center gap-1.5 mt-0.5">
+                              <span className="size-1.5 rounded-full shrink-0" style={{ background: company.color }} />
+                              <span className="truncate">{company.name}</span>
+                            </p>
+                          )}
+                          <p className="text-xs text-amber-600 dark:text-amber-400 font-medium mt-0.5">
+                            Vence hoje ({formatDate(t.due_date)})
+                          </p>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <p className="text-sm font-medium tabular">{formatBRL(t.amount)}</p>
+                          <Badge variant="secondary" className="text-[10px] bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/20 mt-0.5">
+                            hoje
+                          </Badge>
+                        </div>
+                      </Link>
+                    );
+                  })
+                )}
+              </TabsContent>
+
+              <TabsContent value="a_vencer" className="mt-0 space-y-2">
+                {aVencerFuturo.length === 0 ? (
+                  <p className="text-sm text-muted-foreground py-8 text-center">Nenhum título a vencer nos próximos dias.</p>
+                ) : (
+                  aVencerFuturo.map((t) => {
+                    const company = companies.find((c) => c.id === t.company_id);
+                    return (
+                      <Link key={t.id} to="/transacoes" search={{ editId: t.id }} className="flex items-center justify-between py-2 border-b last:border-0 hover:bg-accent/20 px-1 rounded transition-colors cursor-pointer">
+                        <div className="min-w-0 pr-2">
+                          <p className="text-sm font-medium truncate">{t.description}</p>
+                          {company && (
+                            <p className="text-xs text-muted-foreground flex items-center gap-1.5 mt-0.5">
+                              <span className="size-1.5 rounded-full shrink-0" style={{ background: company.color }} />
+                              <span className="truncate">{company.name}</span>
+                            </p>
+                          )}
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            Vence {formatDate(t.due_date)}
+                          </p>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <p className="text-sm font-medium tabular">{formatBRL(t.amount)}</p>
+                          <Badge variant="secondary" className="text-[10px] mt-0.5">
+                            pendente
+                          </Badge>
+                        </div>
+                      </Link>
+                    );
+                  })
+                )}
+              </TabsContent>
+            </CardContent>
+          </Tabs>
         </Card>
       </div>
         </>

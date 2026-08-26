@@ -27,7 +27,7 @@ function EmpresasPage() {
   const { data } = useQuery({
     queryKey: ["companies-admin"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("companies").select("*").order("name");
+      const { data, error } = await supabase.from("companies").select("id, name, kind, color, active, created_at").order("name");
       if (error) throw error;
       return data ?? [];
     },
@@ -52,13 +52,10 @@ function EmpresasPage() {
     setSeeding(true);
     try {
       const demos = [
-        { name: "Empresa 1", kind: "clinica", color: "#6366f1" },
-        { name: "Empresa 2", kind: "clinica", color: "#8b5cf6" },
-        { name: "Empresa 3", kind: "clinica", color: "#06b6d4" },
-        { name: "Empresa 4", kind: "clinica", color: "#10b981" },
-        { name: "Empresa 5", kind: "clinica", color: "#f59e0b" },
-        { name: "Conta Pessoal 1", kind: "pessoal", color: "#ec4899" },
-        { name: "Conta Pessoal 2", kind: "pessoal", color: "#ef4444" },
+        { name: "Clínica Matriz", kind: "clinica" as const, color: "#6366f1" },
+        { name: "Clínica Filial", kind: "clinica" as const, color: "#3b82f6" },
+        { name: "Conta Pessoal 1", kind: "pessoal" as const, color: "#ec4899" },
+        { name: "Conta Pessoal 2", kind: "pessoal" as const, color: "#ef4444" },
       ];
       const { data: comps, error } = await supabase.from("companies").insert(demos).select();
       if (error) throw error;
@@ -73,14 +70,14 @@ function EmpresasPage() {
           { company_id: c.id, bank: "Nubank", name: "Conta PJ", initial_balance: 5000 },
         ]);
         const catData = [
-          { company_id: c.id, name: "Procedimentos", kind: "receita", color: "#10b981" },
-          { company_id: c.id, name: "Convênios", kind: "receita", color: "#06b6d4" },
-          { company_id: c.id, name: "Aluguel", kind: "despesa", color: "#ef4444" },
-          { company_id: c.id, name: "Folha", kind: "despesa", color: "#f59e0b" },
-          { company_id: c.id, name: "Marketing", kind: "despesa", color: "#8b5cf6" },
-          { company_id: c.id, name: "Fornecedores", kind: "despesa", color: "#ec4899" },
+          { company_id: c.id, name: "Procedimentos", kind: "receita" as const, color: "#10b981" },
+          { company_id: c.id, name: "Convênios", kind: "receita" as const, color: "#06b6d4" },
+          { company_id: c.id, name: "Aluguel", kind: "despesa" as const, color: "#ef4444" },
+          { company_id: c.id, name: "Folha", kind: "despesa" as const, color: "#f59e0b" },
+          { company_id: c.id, name: "Marketing", kind: "despesa" as const, color: "#8b5cf6" },
+          { company_id: c.id, name: "Fornecedores", kind: "despesa" as const, color: "#ec4899" },
         ];
-        await supabase.from("categories").insert(catData);
+        await supabase.from("categories").insert(catData as any);
         await supabase.from("cost_centers").insert([
           { company_id: c.id, name: "Comercial" },
           { company_id: c.id, name: "Administrativo" },

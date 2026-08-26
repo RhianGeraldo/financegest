@@ -4,6 +4,7 @@ import { createPortal } from "react-dom";
 import { useAuth } from "@/lib/auth";
 import { CompanySwitcher } from "@/components/company-switcher";
 import { ThemeSelector } from "@/components/theme-toggle";
+import { ChangePasswordDialog } from "@/components/change-password-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -14,7 +15,8 @@ import {
   Users,
   LogOut,
   ChevronRight,
-  UserCircle
+  UserCircle,
+  KeyRound
 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/configuracoes")({
@@ -26,6 +28,7 @@ function ConfiguracoesPage() {
   const { user, signOut, hasRole } = useAuth();
   const isAdmin = hasRole("super_admin");
   const [headerNode, setHeaderNode] = useState<HTMLElement | null>(null);
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false);
 
   useEffect(() => {
     setHeaderNode(document.getElementById("page-header"));
@@ -54,19 +57,34 @@ function ConfiguracoesPage() {
 
       {/* Perfil & Sessão */}
       <Card className="border-none shadow-sm bg-accent/50">
-        <CardContent className="p-4 flex items-center justify-between">
+        <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="size-10 rounded-full bg-primary/10 text-primary flex items-center justify-center">
+            <div className="size-10 rounded-full bg-primary/10 text-primary flex items-center justify-center shrink-0">
               <UserCircle className="size-6" />
             </div>
-            <div className="flex flex-col">
+            <div className="flex flex-col min-w-0">
               <span className="text-sm font-semibold truncate">{user?.email}</span>
               <span className="text-xs text-muted-foreground">{isAdmin ? "Super Admin" : "Usuário"}</span>
             </div>
           </div>
-          <Button variant="outline" size="sm" className="text-destructive border-destructive/20 hover:bg-destructive/10" onClick={signOut}>
-            <LogOut className="size-4 mr-1.5" /> Sair
-          </Button>
+          <div className="flex items-center gap-2 shrink-0">
+            <Button
+              variant="outline"
+              size="sm"
+              className="bg-card hover:bg-accent"
+              onClick={() => setChangePasswordOpen(true)}
+            >
+              <KeyRound className="size-4 mr-1.5 text-primary" /> Alterar Senha
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-destructive border-destructive/20 hover:bg-destructive/10"
+              onClick={signOut}
+            >
+              <LogOut className="size-4 mr-1.5" /> Sair
+            </Button>
+          </div>
         </CardContent>
       </Card>
 
@@ -137,7 +155,14 @@ function ConfiguracoesPage() {
           </Card>
         </div>
       )}
+
+      {/* Modal de Alteração de Senha */}
+      <ChangePasswordDialog
+        open={changePasswordOpen}
+        onOpenChange={setChangePasswordOpen}
+      />
     </div>
   );
 }
+
 

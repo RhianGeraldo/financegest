@@ -32,7 +32,7 @@ function CentrosCustoPage() {
       q = applyCompanyIdsFilter(q, selectedCompanyId, companies);
       const { data, error } = await q;
       if (error) throw error;
-      return data ?? [];
+      return (data as any[]) ?? [];
     }
   });
 
@@ -43,7 +43,7 @@ function CentrosCustoPage() {
       q = applyCompanyIdsFilter(q, selectedCompanyId, companies);
       const { data, error } = await q;
       if (error) throw error;
-      return data ?? [];
+      return (data as any[]) ?? [];
     }
   });
 

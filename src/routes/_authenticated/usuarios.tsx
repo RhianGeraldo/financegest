@@ -36,32 +36,35 @@ function UsuariosPage() {
   const { data: profiles, isPending, isError, error } = useQuery({
     queryKey: ["admin_profiles"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("profiles").select("*").order("created_at", { ascending: false });
+      const { data, error } = await supabase.from("profiles").select("id, full_name, avatar_url, email, created_at").order("created_at", { ascending: false });
       if (error) throw error;
       return data ?? [];
     },
     enabled: isAdmin,
+    staleTime: 5 * 60 * 1000,
     retry: 0,
   });
 
   const { data: roles } = useQuery({
     queryKey: ["admin_roles"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("user_roles").select("*");
+      const { data, error } = await supabase.from("user_roles").select("id, user_id, role");
       if (error) throw error;
       return data ?? [];
     },
     enabled: isAdmin,
+    staleTime: 5 * 60 * 1000,
   });
 
   const { data: members } = useQuery({
     queryKey: ["admin_members"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("company_members").select("*");
+      const { data, error } = await supabase.from("company_members").select("id, company_id, user_id");
       if (error) throw error;
       return data ?? [];
     },
     enabled: isAdmin,
+    staleTime: 5 * 60 * 1000,
   });
 
   if (!isAdmin) {

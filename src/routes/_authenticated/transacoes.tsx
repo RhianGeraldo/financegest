@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
 import { DatePicker } from "@/components/ui/date-picker";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
@@ -20,15 +20,55 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Plus, Search, Trash2, CheckCircle2, Filter, Edit2 } from "lucide-react";
+import { Plus, Search, Trash2, CheckCircle2, Filter, Edit2, Paperclip, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 
+async function uploadReceiptFile(file: File, txId: string): Promise<string | null> {
+  try {
+    const ext = file.name.split(".").pop() || "png";
+    const path = `${txId}/${Date.now()}.${ext}`;
+    const { error: uploadError } = await supabase.storage.from("receipts").upload(path, file, { upsert: true });
+    if (uploadError) {
+      console.warn("Storage upload warn (falling back to DataURL if storage unavailable):", uploadError.message);
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.onerror = () => resolve(null);
+        reader.readAsDataURL(file);
+      });
+    }
+    const { data: publicUrlData } = supabase.storage.from("receipts").getPublicUrl(path);
+    return publicUrlData.publicUrl;
+  } catch (err: any) {
+    console.error("Erro ao enviar comprovante:", err);
+    return null;
+  }
+}
+
+export function getReceiptUrl(t?: { receipt_url?: string | null; notes?: string | null } | null): string | null {
+  if (!t) return null;
+  if (t.receipt_url) return t.receipt_url;
+  if (!t.notes) return null;
+  const match = t.notes.match(/\[Comprovante\]:\s*(https?:\/\/[^\s\n]+)/);
+  return match ? match[1] : null;
+}
+
+interface TransacoesSearch {
+  editId?: string;
+}
+
 export const Route = createFileRoute("/_authenticated/transacoes")({
+  validateSearch: (search: Record<string, unknown>): TransacoesSearch => {
+    return {
+      editId: (search.editId as string) || undefined,
+    };
+  },
   component: TransacoesPage,
   head: () => ({ meta: [{ title: "Transações — Gestão Financeira" }] }),
 });
 
 function TransacoesPage() {
+  const { editId } = Route.useSearch();
   const { selectedCompanyId, companies, canWrite, loading, user } = useAuth();
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
@@ -54,9 +94,12 @@ function TransacoesPage() {
   });
 
   const { data: txs, isPending } = useQuery({
-    queryKey: ["transactions", selectedCompanyId],
+    queryKey: ["transactions", selectedCompanyId, companies.map(c => c.id).join(",")],
     queryFn: async () => {
-      let q = supabase.from("transactions").select("*").order("due_date", { ascending: false });
+      let q = supabase
+        .from("transactions")
+        .select("id, company_id, type, description, amount, category_id, cost_center_id, bank_account_id, due_date, paid_date, status, notes, created_by, paid_by, receipt_url, created_at")
+        .order("due_date", { ascending: false });
       q = applyCompanyFilter(q, selectedCompanyId, companies);
       const { data, error } = await q;
       if (error) throw error;
@@ -64,6 +107,24 @@ function TransacoesPage() {
     },
     enabled: !loading,
   });
+
+  useEffect(() => {
+    if (!editId) return;
+    if (txs) {
+      const found = txs.find((t) => t.id === editId);
+      if (found) {
+        setEditData(found);
+        setOpen(true);
+        return;
+      }
+    }
+    supabase.from("transactions").select("*").eq("id", editId).single().then(({ data }) => {
+      if (data) {
+        setEditData(data);
+        setOpen(true);
+      }
+    });
+  }, [editId, txs]);
 
   const filtered = (txs ?? []).filter((t) => {
     // Descrição
@@ -92,28 +153,65 @@ function TransacoesPage() {
     return true;
   });
 
-  const paidByIds = [...new Set(filtered.map(t => t.paid_by).filter(Boolean))];
+  const userIdsKey = Array.from(new Set([
+    ...(txs ?? []).map(t => t.created_by),
+    ...(txs ?? []).map(t => t.paid_by)
+  ].filter((id): id is string => !!id))).sort().join(",");
+
   const { data: profiles } = useQuery({
-    queryKey: ["profiles", paidByIds],
+    queryKey: ["profiles", userIdsKey],
     queryFn: async () => {
-      if (paidByIds.length === 0) return [];
-      const { data, error } = await supabase.from("profiles").select("id, full_name").in("id", paidByIds);
+      const ids = userIdsKey ? userIdsKey.split(",") : [];
+      if (ids.length === 0) return [];
+      const { data, error } = await supabase.from("profiles").select("id, full_name").in("id", ids);
       if (error) throw error;
       return data ?? [];
     },
-    enabled: paidByIds.length > 0,
+    enabled: userIdsKey.length > 0,
+    staleTime: 10 * 60 * 1000,
   });
 
+  const [markPaidFile, setMarkPaidFile] = useState<File | null>(null);
+  const [previewReceiptUrl, setPreviewReceiptUrl] = useState<string | null>(null);
+
   const submitMarkPaid = async () => {
+    if (!markPaidId) return;
     const timePart = new Date().toISOString().slice(10);
     const finalPaidDate = markPaidDate.includes("T") ? markPaidDate : markPaidDate + timePart;
-    const { error } = await supabase
+    
+    let receiptUrl: string | null = null;
+    if (markPaidFile) {
+      receiptUrl = await uploadReceiptFile(markPaidFile, markPaidId);
+    }
+
+    const payload: any = {
+      status: "pago",
+      paid_date: finalPaidDate,
+      paid_by: user?.id,
+    };
+    if (receiptUrl) payload.receipt_url = receiptUrl;
+
+    let { error } = await supabase
       .from("transactions")
-      .update({ status: "pago", paid_date: finalPaidDate, paid_by: user?.id })
+      .update(payload)
       .eq("id", markPaidId);
+
+    // Fallback gracioso se a coluna receipt_url não existir no banco do Supabase
+    if (error && (error.message.includes("receipt_url") || error.message.includes("schema cache"))) {
+      delete payload.receipt_url;
+      if (receiptUrl) {
+        const { data: currentTx } = await supabase.from("transactions").select("notes").eq("id", markPaidId).single();
+        const existingNotes = currentTx?.notes ? `${currentTx.notes}\n` : "";
+        payload.notes = `${existingNotes}[Comprovante]: ${receiptUrl}`;
+      }
+      const retry = await supabase.from("transactions").update(payload).eq("id", markPaidId);
+      error = retry.error;
+    }
+
     if (error) return toast.error("Erro", { description: error.message });
-    toast.success("Marcada como paga");
+    toast.success("Marcada como paga com sucesso");
     setMarkPaidId(null);
+    setMarkPaidFile(null);
     qc.invalidateQueries({ queryKey: ["transactions"] });
     qc.invalidateQueries({ queryKey: ["tx"] });
   };
@@ -148,19 +246,65 @@ function TransacoesPage() {
 
 
       {/* Mark Paid Dialog */}
-      <Dialog open={!!markPaidId} onOpenChange={(o) => !o && setMarkPaidId(null)}>
+      <Dialog open={!!markPaidId} onOpenChange={(o) => { if (!o) { setMarkPaidId(null); setMarkPaidFile(null); } }}>
         <DialogContent className="sm:max-w-sm">
-          <DialogHeader><DialogTitle>Confirmar pagamento</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>Confirmar pagamento</DialogTitle>
+            <DialogDescription className="sr-only">Selecione a data e comprovante do pagamento</DialogDescription>
+          </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label>Data do Pagamento</Label>
               <DatePicker value={markPaidDate} onChange={(v) => setMarkPaidDate(v)} />
             </div>
+            <div className="space-y-2">
+              <Label>Comprovante de Pagamento (opcional)</Label>
+              <Input
+                type="file"
+                accept="image/*,application/pdf"
+                onChange={(e) => setMarkPaidFile(e.target.files?.[0] || null)}
+              />
+            </div>
           </div>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setMarkPaidId(null)}>Cancelar</Button>
+            <Button variant="ghost" onClick={() => { setMarkPaidId(null); setMarkPaidFile(null); }}>Cancelar</Button>
             <Button onClick={submitMarkPaid}>Confirmar</Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Receipt Preview Dialog */}
+      <Dialog open={!!previewReceiptUrl} onOpenChange={(o) => !o && setPreviewReceiptUrl(null)}>
+        <DialogContent className="sm:max-w-xl max-h-[90vh] flex flex-col p-4">
+          <DialogHeader className="pb-2">
+            <DialogTitle className="text-base flex items-center justify-between">
+              <span>Comprovante de Pagamento</span>
+              {previewReceiptUrl && (
+                <a
+                  href={previewReceiptUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-primary font-normal flex items-center gap-1 hover:underline mr-6"
+                >
+                  <ExternalLink className="size-3" /> Abrir em nova aba
+                </a>
+              )}
+            </DialogTitle>
+            <DialogDescription className="sr-only">Visualização do comprovante de pagamento anexado</DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 overflow-auto flex items-center justify-center min-h-[300px] bg-muted/20 rounded-md p-2 border">
+            {previewReceiptUrl && (
+              previewReceiptUrl.endsWith(".pdf") || previewReceiptUrl.includes("application/pdf") ? (
+                <iframe src={previewReceiptUrl} className="w-full h-[500px] rounded border-0" title="Comprovante PDF" />
+              ) : (
+                <img
+                  src={previewReceiptUrl}
+                  alt="Comprovante de Pagamento"
+                  className="max-h-[500px] max-w-full object-contain rounded shadow-sm"
+                />
+              )
+            )}
+          </div>
         </DialogContent>
       </Dialog>
 
@@ -173,7 +317,7 @@ function TransacoesPage() {
                   <DialogTrigger asChild>
                     <Button className="flex-1 sm:flex-none" onClick={() => setEditData(null)}><Plus className="size-4 mr-1" /> Nova transação</Button>
                   </DialogTrigger>
-                  {open && <TransactionDialog initialData={editData} onClose={() => { setOpen(false); setEditData(null); }} />}
+                  {open && <TransactionDialog initialData={editData} onClose={() => { setOpen(false); setEditData(null); }} onPreviewReceipt={(url) => setPreviewReceiptUrl(url)} />}
                 </Dialog>
               )}
               <Button className="flex-1 sm:flex-none" variant={showFilters ? "secondary" : "outline"} onClick={() => setShowFilters(!showFilters)}>
@@ -262,14 +406,23 @@ function TransacoesPage() {
                           <span className="truncate">{company.name}</span>
                         </p>
                       )}
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Lançado por: <span className="font-medium text-foreground">{profiles?.find((p: any) => p.id === t.created_by)?.full_name || "Usuário"}</span> em {formatDateTime(t.created_at)}
+                      </p>
                       <p className="text-xs text-muted-foreground mt-0.5">Vencimento: {formatDate(t.due_date)}</p>
                       {t.paid_date && (
                         <p className="text-xs text-muted-foreground mt-0.5">
-                          Pago em: {formatDateTime(t.paid_date)}
-                          {t.paid_by && profiles?.find((p: any) => p.id === t.paid_by) && (
-                            <span> por {profiles.find((p: any) => p.id === t.paid_by)?.full_name}</span>
-                          )}
+                          Baixa por: <span className="font-medium text-foreground">{profiles?.find((p: any) => p.id === t.paid_by)?.full_name || "Usuário"}</span> em {formatDateTime(t.paid_date)}
                         </p>
+                      )}
+                      {getReceiptUrl(t) && (
+                        <button
+                          type="button"
+                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); setPreviewReceiptUrl(getReceiptUrl(t)); }}
+                          className="text-xs text-primary font-medium flex items-center gap-1 mt-1 hover:underline text-left"
+                        >
+                          <Paperclip className="size-3" /> Ver comprovante
+                        </button>
                       )}
                     </div>
                     <div className="text-right shrink-0 flex flex-col items-end">
@@ -324,6 +477,7 @@ function TransacoesPage() {
                 <tr className="text-left">
                   <th className="py-2 px-2">Descrição</th>
                   <th className="py-2 px-2">Tipo</th>
+                  <th className="py-2 px-2">Lançamento</th>
                   <th className="py-2 px-2">Vencimento</th>
                   <th className="py-2 px-2">Pagamento</th>
                   <th className="py-2 px-2">Status</th>
@@ -351,13 +505,29 @@ function TransacoesPage() {
                           {t.type === "entrada" ? "Entrada" : "Saída"}
                         </Badge>
                       </td>
+                      <td className="py-3 px-2 text-muted-foreground">
+                        <div className="flex flex-col">
+                          <span>{formatDateTime(t.created_at)}</span>
+                          <span className="text-[10px] opacity-80">por {profiles?.find((p: any) => p.id === t.created_by)?.full_name || "Usuário"}</span>
+                        </div>
+                      </td>
                       <td className="py-3 px-2">{formatDate(t.due_date)}</td>
                       <td className="py-3 px-2 text-muted-foreground">
-                        {t.paid_date ? (
+                        {t.paid_date || getReceiptUrl(t) ? (
                           <div className="flex flex-col">
-                            <span>{formatDateTime(t.paid_date)}</span>
+                            {t.paid_date && <span>{formatDateTime(t.paid_date)}</span>}
                             {t.paid_by && profiles?.find((p: any) => p.id === t.paid_by) && (
                               <span className="text-[10px] opacity-80">por {profiles.find((p: any) => p.id === t.paid_by)?.full_name}</span>
+                            )}
+                            {getReceiptUrl(t) && (
+                              <button
+                                type="button"
+                                onClick={(e) => { e.preventDefault(); e.stopPropagation(); setPreviewReceiptUrl(getReceiptUrl(t)); }}
+                                className="text-xs text-primary font-medium flex items-center gap-1 mt-0.5 hover:underline text-left"
+                                title="Ver Comprovante"
+                              >
+                                <Paperclip className="size-3" /> Comprovante
+                              </button>
                             )}
                           </div>
                         ) : "-"}
@@ -408,13 +578,13 @@ function TransacoesPage() {
                 })}
                 {isPending ? (
                   <tr>
-                    <td colSpan={7} className="py-12 text-center text-sm text-muted-foreground animate-pulse">
+                    <td colSpan={8} className="py-12 text-center text-sm text-muted-foreground animate-pulse">
                       Carregando transações...
                     </td>
                   </tr>
                 ) : filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="py-12 text-center text-sm text-muted-foreground">
+                    <td colSpan={8} className="py-12 text-center text-sm text-muted-foreground">
                       Nenhuma transação encontrada.
                     </td>
                   </tr>
@@ -428,7 +598,7 @@ function TransacoesPage() {
   );
 }
 
-function TransactionDialog({ onClose, initialData }: { onClose: () => void; initialData?: any }) {
+function TransactionDialog({ onClose, initialData, onPreviewReceipt }: { onClose: () => void; initialData?: any; onPreviewReceipt?: (url: string) => void }) {
   const { companies, selectedCompanyId, user } = useAuth();
   const qc = useQueryClient();
 
@@ -483,8 +653,13 @@ function TransactionDialog({ onClose, initialData }: { onClose: () => void; init
     };
   });
 
+  const [receiptFile, setReceiptFile] = useState<File | null>(null);
+  const [currentReceiptUrl, setCurrentReceiptUrl] = useState<string | null>(initialData?.receipt_url ?? null);
+
   useEffect(() => {
     if (initialData) {
+      setCurrentReceiptUrl(getReceiptUrl(initialData));
+      setReceiptFile(null);
       setForm({
         company_id: initialData.company_id ?? getSelectedCompanyId(),
         type: initialData.type ?? "saida",
@@ -501,6 +676,8 @@ function TransactionDialog({ onClose, initialData }: { onClose: () => void; init
         amountType: "total" as "total" | "parcela",
       });
     } else {
+      setCurrentReceiptUrl(null);
+      setReceiptFile(null);
       setForm({
         company_id: getSelectedCompanyId(),
         type: "saida" as "entrada" | "saida",
@@ -553,6 +730,17 @@ function TransactionDialog({ onClose, initialData }: { onClose: () => void; init
     enabled: !!initialData?.paid_by,
   });
 
+  const { data: createdByProfile } = useQuery({
+    queryKey: ["profile", initialData?.created_by],
+    queryFn: async () => {
+      if (!initialData?.created_by) return null;
+      const { data, error } = await supabase.from("profiles").select("full_name").eq("id", initialData.created_by).single();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!initialData?.created_by,
+  });
+
   const submit = async () => {
     if (!form.company_id) return toast.error("Selecione uma empresa");
     if (!form.description) return toast.error("Informe a descrição");
@@ -574,7 +762,13 @@ function TransactionDialog({ onClose, initialData }: { onClose: () => void; init
     setSaving(true);
     
     if (initialData) {
-      const payload = {
+      let finalReceiptUrl = currentReceiptUrl;
+      if (receiptFile && initialData.id) {
+        const uploaded = await uploadReceiptFile(receiptFile, initialData.id);
+        if (uploaded) finalReceiptUrl = uploaded;
+      }
+
+      const payload: any = {
         company_id: form.company_id,
         type: form.type,
         description: form.description,
@@ -585,33 +779,68 @@ function TransactionDialog({ onClose, initialData }: { onClose: () => void; init
           ? (form.paid_date.includes("T") ? form.paid_date : form.paid_date + new Date().toISOString().slice(10)) 
           : null,
         paid_by: form.status === "pago" ? (initialData.status === "pago" ? initialData.paid_by : user?.id) : null,
+        receipt_url: form.status === "pago" ? finalReceiptUrl : null,
         category_id: form.category_id !== "none" ? form.category_id : null,
         cost_center_id: form.cost_center_id !== "none" ? form.cost_center_id : null,
         notes: form.notes || null,
       };
-      const { error } = await supabase.from("transactions").update(payload).eq("id", initialData.id);
+      let { error } = await supabase.from("transactions").update(payload).eq("id", initialData.id);
+      
+      if (error && (error.message.includes("receipt_url") || error.message.includes("schema cache"))) {
+        delete payload.receipt_url;
+        if (finalReceiptUrl) {
+          const existingNotes = form.notes ? `${form.notes}\n` : "";
+          payload.notes = `${existingNotes}[Comprovante]: ${finalReceiptUrl}`;
+        }
+        const retry = await supabase.from("transactions").update(payload).eq("id", initialData.id);
+        error = retry.error;
+      }
+
       setSaving(false);
       if (error) return toast.error("Erro", { description: error.message });
       toast.success("Transação atualizada");
     } else {
+      let newReceiptUrl: string | null = null;
+      if (receiptFile && form.status === "pago") {
+        const tempId = crypto.randomUUID();
+        newReceiptUrl = await uploadReceiptFile(receiptFile, tempId);
+      }
+
       const payloads: any[] = [];
       for (let i = 0; i < numInstallments; i++) {
-      payloads.push({
-        company_id: form.company_id,
-        type: form.type,
-        description: form.isInstallment ? `${form.description} (${i + 1}/${numInstallments})` : form.description,
-        amount: baseAmount,
-        due_date: addMonths(form.due_date, i),
-        status: i === 0 ? form.status : "pendente",
-        paid_date: i === 0 && form.status === "pago" ? todayISO() + new Date().toISOString().slice(10) : null,
-        paid_by: i === 0 && form.status === "pago" ? user?.id : null,
-        category_id: form.category_id !== "none" ? form.category_id : null,
-        cost_center_id: form.cost_center_id !== "none" ? form.cost_center_id : null,
-        notes: form.notes || null,
-      });
-    }
+        payloads.push({
+          company_id: form.company_id,
+          type: form.type,
+          description: form.isInstallment ? `${form.description} (${i + 1}/${numInstallments})` : form.description,
+          amount: baseAmount,
+          due_date: addMonths(form.due_date, i),
+          status: i === 0 ? form.status : "pendente",
+          paid_date: i === 0 && form.status === "pago" ? todayISO() + new Date().toISOString().slice(10) : null,
+          paid_by: i === 0 && form.status === "pago" ? user?.id : null,
+          receipt_url: i === 0 && form.status === "pago" ? newReceiptUrl : null,
+          created_by: user?.id,
+          category_id: form.category_id !== "none" ? form.category_id : null,
+          cost_center_id: form.cost_center_id !== "none" ? form.cost_center_id : null,
+          notes: form.notes || null,
+        });
+      }
 
-      const { error } = await supabase.from("transactions").insert(payloads);
+      let { error } = await supabase.from("transactions").insert(payloads);
+
+      if (error && (error.message.includes("receipt_url") || error.message.includes("schema cache"))) {
+        const fallbackPayloads = payloads.map((p) => {
+          const cp = { ...p };
+          if (cp.receipt_url) {
+            const existingNotes = cp.notes ? `${cp.notes}\n` : "";
+            cp.notes = `${existingNotes}[Comprovante]: ${cp.receipt_url}`;
+          }
+          delete cp.receipt_url;
+          return cp;
+        });
+        const retry = await supabase.from("transactions").insert(fallbackPayloads);
+        error = retry.error;
+      }
+
       setSaving(false);
       if (error) return toast.error("Erro", { description: error.message });
       toast.success(form.isInstallment ? `${numInstallments} parcelas criadas` : "Transação criada");
@@ -623,8 +852,11 @@ function TransactionDialog({ onClose, initialData }: { onClose: () => void; init
   };
 
   return (
-    <DialogContent className="sm:max-w-md">
-      <DialogHeader><DialogTitle>Nova transação</DialogTitle></DialogHeader>
+    <DialogContent className="w-[95vw] sm:max-w-lg max-h-[90vh] overflow-y-auto p-4 sm:p-6">
+      <DialogHeader>
+        <DialogTitle>{initialData ? "Editar transação" : "Nova transação"}</DialogTitle>
+        <DialogDescription className="sr-only">Preencha os campos da transação</DialogDescription>
+      </DialogHeader>
       <div className="space-y-3">
         <div className="space-y-1.5">
           <Label>Empresa</Label>
@@ -698,15 +930,43 @@ function TransactionDialog({ onClose, initialData }: { onClose: () => void; init
             <DatePicker value={form.due_date} onChange={(v) => setForm({ ...form, due_date: v })} />
           </div>
           {form.status === "pago" && (
-            <div className="space-y-1.5">
-              <Label>Data de Pagamento</Label>
-              <DatePicker value={form.paid_date} onChange={(v) => setForm({ ...form, paid_date: v })} />
+            <>
+              <div className="space-y-1.5">
+                <Label>Data de Pagamento</Label>
+                <DatePicker value={form.paid_date} onChange={(v) => setForm({ ...form, paid_date: v })} />
+              </div>
+              <div className="col-span-1 sm:col-span-2 space-y-1.5 mt-1">
+                <Label>Comprovante de Pagamento (opcional)</Label>
+                {currentReceiptUrl && (
+                  <div className="text-xs flex items-center gap-2 mb-1">
+                    <button
+                      type="button"
+                      onClick={() => onPreviewReceipt?.(currentReceiptUrl)}
+                      className="text-primary hover:underline flex items-center gap-1 font-medium text-left"
+                    >
+                      <Paperclip className="size-3.5" /> Visualizar comprovante anexo
+                    </button>
+                  </div>
+                )}
+                <Input
+                  type="file"
+                  accept="image/*,application/pdf"
+                  onChange={(e) => setReceiptFile(e.target.files?.[0] || null)}
+                />
+              </div>
+            </>
+          )}
+          {initialData && (
+            <div className="col-span-1 sm:col-span-2 space-y-1.5 mt-2 pt-2 border-t border-dashed">
+              <Label className="text-muted-foreground text-xs block">
+                Lançado por: <span className="font-medium text-foreground">{createdByProfile?.full_name || "Usuário"}</span> em {formatDateTime(initialData.created_at)}
+              </Label>
             </div>
           )}
-          {form.status === "pago" && paidByProfile && (
-            <div className="col-span-1 sm:col-span-2 space-y-1.5 mt-2">
+          {form.status === "pago" && paidByProfile && initialData?.paid_date && (
+            <div className="col-span-1 sm:col-span-2 space-y-1.5 mt-1">
               <Label className="text-muted-foreground text-xs block">
-                Baixa realizada por: <span className="font-medium text-foreground">{paidByProfile.full_name}</span>
+                Baixa realizada por: <span className="font-medium text-foreground">{paidByProfile.full_name}</span> em {formatDateTime(initialData.paid_date)}
               </Label>
             </div>
           )}

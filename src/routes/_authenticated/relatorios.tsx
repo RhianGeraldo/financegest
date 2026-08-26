@@ -35,18 +35,22 @@ function RelatoriosPage() {
   }, []);
 
   const { data: txs, isPending } = useQuery({
-    queryKey: ["transactions", selectedCompanyId],
+    queryKey: ["transactions", selectedCompanyId, companies.map(c => c.id).join(",")],
     queryFn: async () => {
-      let q = supabase.from("transactions").select("amount, type, status, due_date, paid_date, category_id");
+      let q = supabase
+        .from("transactions")
+        .select("id, company_id, type, description, amount, category_id, cost_center_id, bank_account_id, due_date, paid_date, status, notes, created_by, paid_by, receipt_url, created_at")
+        .order("due_date", { ascending: false });
       q = applyCompanyFilter(q, selectedCompanyId, companies);
-      const { data, error } = await q.order("due_date", { ascending: false });
+      const { data, error } = await q;
       if (error) throw error;
       return data ?? [];
     },
+    enabled: !loading,
   });
 
   const { data: cats } = useQuery({
-    queryKey: ["categories", selectedCompanyId],
+    queryKey: ["categories", selectedCompanyId, companies.map(c => c.id).join(",")],
     queryFn: async () => {
       let q = supabase.from("categories").select("id, name, color, kind");
       q = applyCompanyFilter(q, selectedCompanyId, companies);

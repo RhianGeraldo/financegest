@@ -440,11 +440,11 @@ export function CrudDialog({ table, queryKey, fields, initialData, onClose, comp
                     {f.options.map((o) => (
                       <label key={o.value} className="flex items-center gap-2 text-sm cursor-pointer hover:bg-accent/50 p-1.5 rounded-md -mx-1.5 transition-colors">
                         <Checkbox 
-                          checked={(values[f.name] || []).includes(o.value)} 
+                          checked={Array.isArray(values[f.name]) ? (values[f.name] as unknown as any[]).includes(o.value) : false} 
                           onCheckedChange={(checked) => {
-                            const current = values[f.name] || [];
-                            if (checked) setValues({ ...values, [f.name]: [...current, o.value] });
-                            else setValues({ ...values, [f.name]: current.filter((v: any) => v !== o.value) });
+                            const current = (Array.isArray(values[f.name]) ? values[f.name] : []) as any[];
+                            if (checked) setValues({ ...values, [f.name]: [...current, o.value] as any });
+                            else setValues({ ...values, [f.name]: current.filter((v: any) => v !== o.value) as any });
                           }}
                         />
                         {o.label}
