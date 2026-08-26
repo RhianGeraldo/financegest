@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { useAuth } from "@/lib/auth";
 import { CompanySwitcher } from "@/components/company-switcher";
+import { ThemeSelector } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -69,6 +70,16 @@ function ConfiguracoesPage() {
         </CardContent>
       </Card>
 
+      {/* Aparência & Tema */}
+      <div className="space-y-2">
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground px-1">Aparência do Sistema</h2>
+        <Card className="shadow-sm">
+          <CardContent className="p-4">
+            <ThemeSelector />
+          </CardContent>
+        </Card>
+      </div>
+
       {/* Escopo de Dados (Empresa) */}
       <div className="space-y-2">
         <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground px-1">Escopo de Dados</h2>
@@ -129,3 +140,4 @@ function ConfiguracoesPage() {
     </div>
   );
 }
+

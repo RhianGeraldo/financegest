@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth, applyCompanyFilter } from "@/lib/auth";
-import { formatBRL, formatDate, statusLabel, todayISO, maskBRL, parseBRL, addMonths } from "@/lib/format";
+import { formatBRL, formatDate, formatDateTime, statusLabel, todayISO, maskBRL, parseBRL, addMonths } from "@/lib/format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -92,11 +92,24 @@ function TransacoesPage() {
     return true;
   });
 
+  const paidByIds = [...new Set(filtered.map(t => t.paid_by).filter(Boolean))];
+  const { data: profiles } = useQuery({
+    queryKey: ["profiles", paidByIds],
+    queryFn: async () => {
+      if (paidByIds.length === 0) return [];
+      const { data, error } = await supabase.from("profiles").select("id, full_name").in("id", paidByIds);
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: paidByIds.length > 0,
+  });
+
   const submitMarkPaid = async () => {
-    if (!markPaidId) return;
+    const timePart = new Date().toISOString().slice(10);
+    const finalPaidDate = markPaidDate.includes("T") ? markPaidDate : markPaidDate + timePart;
     const { error } = await supabase
       .from("transactions")
-      .update({ status: "pago", paid_date: markPaidDate, paid_by: user?.id })
+      .update({ status: "pago", paid_date: finalPaidDate, paid_by: user?.id })
       .eq("id", markPaidId);
     if (error) return toast.error("Erro", { description: error.message });
     toast.success("Marcada como paga");
@@ -251,7 +264,12 @@ function TransacoesPage() {
                       )}
                       <p className="text-xs text-muted-foreground mt-0.5">Vencimento: {formatDate(t.due_date)}</p>
                       {t.paid_date && (
-                        <p className="text-xs text-muted-foreground mt-0.5">Pago em: {formatDate(t.paid_date)}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          Pago em: {formatDateTime(t.paid_date)}
+                          {t.paid_by && profiles?.find((p: any) => p.id === t.paid_by) && (
+                            <span> por {profiles.find((p: any) => p.id === t.paid_by)?.full_name}</span>
+                          )}
+                        </p>
                       )}
                     </div>
                     <div className="text-right shrink-0 flex flex-col items-end">
@@ -334,7 +352,16 @@ function TransacoesPage() {
                         </Badge>
                       </td>
                       <td className="py-3 px-2">{formatDate(t.due_date)}</td>
-                      <td className="py-3 px-2 text-muted-foreground">{t.paid_date ? formatDate(t.paid_date) : "-"}</td>
+                      <td className="py-3 px-2 text-muted-foreground">
+                        {t.paid_date ? (
+                          <div className="flex flex-col">
+                            <span>{formatDateTime(t.paid_date)}</span>
+                            {t.paid_by && profiles?.find((p: any) => p.id === t.paid_by) && (
+                              <span className="text-[10px] opacity-80">por {profiles.find((p: any) => p.id === t.paid_by)?.full_name}</span>
+                            )}
+                          </div>
+                        ) : "-"}
+                      </td>
                       <td className="py-3 px-2">
                         <Badge variant={st === "pago" ? "default" : st === "atrasado" ? "destructive" : "secondary"}>
                           {st}
@@ -554,7 +581,9 @@ function TransactionDialog({ onClose, initialData }: { onClose: () => void; init
         amount: baseAmount,
         due_date: form.due_date,
         status: form.status,
-        paid_date: form.status === "pago" ? form.paid_date : null,
+        paid_date: form.status === "pago" 
+          ? (form.paid_date.includes("T") ? form.paid_date : form.paid_date + new Date().toISOString().slice(10)) 
+          : null,
         paid_by: form.status === "pago" ? (initialData.status === "pago" ? initialData.paid_by : user?.id) : null,
         category_id: form.category_id !== "none" ? form.category_id : null,
         cost_center_id: form.cost_center_id !== "none" ? form.cost_center_id : null,
@@ -574,7 +603,8 @@ function TransactionDialog({ onClose, initialData }: { onClose: () => void; init
         amount: baseAmount,
         due_date: addMonths(form.due_date, i),
         status: i === 0 ? form.status : "pendente",
-        paid_date: i === 0 && form.status === "pago" ? todayISO() : null,
+        paid_date: i === 0 && form.status === "pago" ? todayISO() + new Date().toISOString().slice(10) : null,
+        paid_by: i === 0 && form.status === "pago" ? user?.id : null,
         category_id: form.category_id !== "none" ? form.category_id : null,
         cost_center_id: form.cost_center_id !== "none" ? form.cost_center_id : null,
         notes: form.notes || null,

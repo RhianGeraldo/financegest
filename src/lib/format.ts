@@ -35,6 +35,16 @@ export function formatDate(d: string | Date | null | undefined): string {
   return date.toLocaleDateString("pt-BR");
 }
 
+export function formatDateTime(d: string | Date | null | undefined): string {
+  if (!d) return "—";
+  const date = typeof d === "string" ? new Date(d + (d.length === 10 ? "T12:00:00" : "")) : d;
+  if (Number.isNaN(date.getTime())) return "—";
+  if (typeof d === "string" && d.length === 10) {
+    return date.toLocaleDateString("pt-BR");
+  }
+  return date.toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
+}
+
 export function todayISO(): string {
   return new Date().toISOString().slice(0, 10);
 }
