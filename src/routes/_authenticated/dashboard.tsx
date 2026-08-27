@@ -162,229 +162,231 @@ function DashboardPage() {
         <>
 
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-        {stats.map((s) => (
-          <Card key={s.label}>
-            <CardContent className="pt-5">
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-muted-foreground">{s.label}</span>
-                <s.icon className={`size-4 ${s.accent}`} />
-              </div>
-              <div className="mt-2 text-xl font-semibold tabular">{s.value}</div>
+      <div className="flex flex-col gap-6">
+        <div className="order-2 lg:order-1 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+          {stats.map((s) => (
+            <Card key={s.label}>
+              <CardContent className="pt-5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-muted-foreground">{s.label}</span>
+                  <s.icon className={`size-4 ${s.accent}`} />
+                </div>
+                <div className="mt-2 text-xl font-semibold tabular">{s.value}</div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        <div className="order-3 lg:order-2 grid gap-4 lg:grid-cols-3">
+          <Card className="lg:col-span-2 min-w-0 overflow-hidden">
+            <CardHeader>
+              <CardTitle className="text-base">Fluxo de caixa — últimos 6 meses</CardTitle>
+            </CardHeader>
+            <CardContent className="h-72 min-w-0">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={months}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                  <XAxis dataKey="label" stroke="var(--muted-foreground)" fontSize={12} />
+                  <YAxis stroke="var(--muted-foreground)" fontSize={12} tickFormatter={(v) => formatBRL(v).replace("R$", "")} />
+                  <Tooltip
+                    contentStyle={{ background: "var(--popover)", border: "1px solid var(--border)", borderRadius: 8 }}
+                    formatter={(v: number) => formatBRL(v)}
+                  />
+                  <Line type="monotone" dataKey="entrada" stroke="var(--success)" strokeWidth={2} dot={false} name="Entradas" />
+                  <Line type="monotone" dataKey="saida" stroke="var(--destructive)" strokeWidth={2} dot={false} name="Saídas" />
+                </LineChart>
+              </ResponsiveContainer>
             </CardContent>
           </Card>
-        ))}
-      </div>
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        <Card className="lg:col-span-2 min-w-0 overflow-hidden">
-          <CardHeader>
-            <CardTitle className="text-base">Fluxo de caixa — últimos 6 meses</CardTitle>
-          </CardHeader>
-          <CardContent className="h-72 min-w-0">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={months}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                <XAxis dataKey="label" stroke="var(--muted-foreground)" fontSize={12} />
-                <YAxis stroke="var(--muted-foreground)" fontSize={12} tickFormatter={(v) => formatBRL(v).replace("R$", "")} />
-                <Tooltip
-                  contentStyle={{ background: "var(--popover)", border: "1px solid var(--border)", borderRadius: 8 }}
-                  formatter={(v: number) => formatBRL(v)}
-                />
-                <Line type="monotone" dataKey="entrada" stroke="var(--success)" strokeWidth={2} dot={false} name="Entradas" />
-                <Line type="monotone" dataKey="saida" stroke="var(--destructive)" strokeWidth={2} dot={false} name="Saídas" />
-              </LineChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        <Card className="min-w-0 overflow-hidden">
-          <CardHeader>
-            <CardTitle className="text-base">Despesas por categoria (mês)</CardTitle>
-          </CardHeader>
-          <CardContent className="h-72 min-w-0">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={Object.entries(
-                    monthPaid
-                      .filter((t) => t.type === "saida")
-                      .reduce<Record<string, number>>((acc, t) => {
-                        const k = t.category_id ?? "Outros";
-                        acc[k] = (acc[k] ?? 0) + Number(t.amount);
-                        return acc;
-                      }, {}),
-                  ).map(([name, value]) => ({ name, value }))}
-                  dataKey="value"
-                  innerRadius={50}
-                  outerRadius={90}
-                >
-                  {["chart-1", "chart-2", "chart-3", "chart-4", "chart-5"].map((_, i) => (
-                    <Cell key={i} fill={`var(--chart-${(i % 5) + 1})`} />
-                  ))}
-                </Pie>
-                <Tooltip formatter={(v: number) => formatBRL(v)} contentStyle={{ background: "var(--popover)", border: "1px solid var(--border)" }} />
-              </PieChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid gap-4 lg:grid-cols-2 items-stretch">
-        <Card className="flex flex-col h-full">
-          <CardHeader>
-            <CardTitle className="text-base font-semibold">Últimas transações</CardTitle>
-          </CardHeader>
-          <CardContent className="flex-1 space-y-2 overflow-y-auto max-h-[480px]">
-            {recent.length === 0 && <p className="text-sm text-muted-foreground py-6 text-center">Sem transações ainda.</p>}
-            {recent.map((t) => {
-              const st = statusLabel(t.status, t.due_date);
-              const company = companies.find((c) => c.id === t.company_id);
-              return (
-                <Link key={t.id} to="/transacoes" search={{ editId: t.id }} className="flex items-center justify-between py-2 border-b last:border-0 hover:bg-accent/20 px-1 rounded transition-colors cursor-pointer">
-                  <div className="min-w-0 pr-2">
-                    <p className="text-sm font-medium truncate">{t.description}</p>
-                    {company && (
-                      <p className="text-xs text-muted-foreground flex items-center gap-1.5 mt-0.5">
-                        <span className="size-1.5 rounded-full shrink-0" style={{ background: company.color }} />
-                        <span className="truncate">{company.name}</span>
-                      </p>
-                    )}
-                    <p className="text-xs text-muted-foreground mt-0.5">{formatDate(t.due_date)}</p>
-                  </div>
-                  <div className="text-right shrink-0">
-                    <p className={`text-sm font-medium tabular ${t.type === "entrada" ? "text-success" : "text-destructive"}`}>
-                      {t.type === "entrada" ? "+" : "-"} {formatBRL(t.amount)}
-                    </p>
-                    <Badge variant={st === "pago" ? "default" : st === "atrasado" ? "destructive" : "secondary"} className="text-[10px]">
-                      {st}
-                    </Badge>
-                  </div>
-                </Link>
-              );
-            })}
-          </CardContent>
-        </Card>
-
-        <Card className="flex flex-col h-full">
-          <Tabs defaultValue={vencidos.length > 0 ? "vencidos" : aVencerHoje.length > 0 ? "hoje" : "a_vencer"} className="flex flex-col h-full">
-            <CardHeader className="pb-3">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <CardTitle className="text-base font-semibold whitespace-nowrap shrink-0">Próximos vencimentos</CardTitle>
-                <TabsList className="h-8 p-1 w-full sm:w-auto overflow-x-auto justify-start sm:justify-center shrink-0">
-                  <TabsTrigger value="vencidos" className="text-xs px-2.5 h-6 shrink-0">
-                    Vencidos ({vencidos.length})
-                  </TabsTrigger>
-                  <TabsTrigger value="hoje" className="text-xs px-2.5 h-6 shrink-0">
-                    A vencer hoje ({aVencerHoje.length})
-                  </TabsTrigger>
-                  <TabsTrigger value="a_vencer" className="text-xs px-2.5 h-6 shrink-0">
-                    A vencer ({aVencerFuturo.length})
-                  </TabsTrigger>
-                </TabsList>
-              </div>
+          <Card className="min-w-0 overflow-hidden">
+            <CardHeader>
+              <CardTitle className="text-base">Despesas por categoria (mês)</CardTitle>
             </CardHeader>
-
-            <CardContent className="pt-2 flex-1 overflow-y-auto min-h-[480px] sm:min-h-[360px] max-h-[580px] sm:max-h-[480px] pr-1">
-              <TabsContent value="vencidos" className="mt-0 space-y-2">
-                {vencidos.length === 0 ? (
-                  <p className="text-sm text-muted-foreground py-8 text-center">Nenhum título vencido.</p>
-                ) : (
-                  vencidos.map((t) => {
-                    const daysOverdue = getDaysOverdue(t.due_date);
-                    const company = companies.find((c) => c.id === t.company_id);
-                    return (
-                      <Link key={t.id} to="/transacoes" search={{ editId: t.id }} className="flex items-center justify-between py-2 border-b last:border-0 hover:bg-accent/20 px-1 rounded transition-colors cursor-pointer">
-                        <div className="min-w-0 pr-2">
-                          <p className="text-sm font-medium truncate">{t.description}</p>
-                          {company && (
-                            <p className="text-xs text-muted-foreground flex items-center gap-1.5 mt-0.5">
-                              <span className="size-1.5 rounded-full shrink-0" style={{ background: company.color }} />
-                              <span className="truncate">{company.name}</span>
-                            </p>
-                          )}
-                          <p className="text-xs text-destructive font-medium mt-0.5">
-                            Venceu {formatDate(t.due_date)} • {daysOverdue} {daysOverdue === 1 ? "dia" : "dias"} em atraso
-                          </p>
-                        </div>
-                        <div className="text-right shrink-0">
-                          <p className="text-sm font-medium tabular">{formatBRL(t.amount)}</p>
-                          <Badge variant="destructive" className="text-[10px] mt-0.5">
-                            atrasado
-                          </Badge>
-                        </div>
-                      </Link>
-                    );
-                  })
-                )}
-              </TabsContent>
-
-              <TabsContent value="hoje" className="mt-0 space-y-2">
-                {aVencerHoje.length === 0 ? (
-                  <p className="text-sm text-muted-foreground py-8 text-center">Nenhum título a vencer hoje.</p>
-                ) : (
-                  aVencerHoje.map((t) => {
-                    const company = companies.find((c) => c.id === t.company_id);
-                    return (
-                      <Link key={t.id} to="/transacoes" search={{ editId: t.id }} className="flex items-center justify-between py-2 border-b last:border-0 hover:bg-accent/20 px-1 rounded transition-colors cursor-pointer">
-                        <div className="min-w-0 pr-2">
-                          <p className="text-sm font-medium truncate">{t.description}</p>
-                          {company && (
-                            <p className="text-xs text-muted-foreground flex items-center gap-1.5 mt-0.5">
-                              <span className="size-1.5 rounded-full shrink-0" style={{ background: company.color }} />
-                              <span className="truncate">{company.name}</span>
-                            </p>
-                          )}
-                          <p className="text-xs text-amber-600 dark:text-amber-400 font-medium mt-0.5">
-                            Vence hoje ({formatDate(t.due_date)})
-                          </p>
-                        </div>
-                        <div className="text-right shrink-0">
-                          <p className="text-sm font-medium tabular">{formatBRL(t.amount)}</p>
-                          <Badge variant="secondary" className="text-[10px] bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/20 mt-0.5">
-                            hoje
-                          </Badge>
-                        </div>
-                      </Link>
-                    );
-                  })
-                )}
-              </TabsContent>
-
-              <TabsContent value="a_vencer" className="mt-0 space-y-2">
-                {aVencerFuturo.length === 0 ? (
-                  <p className="text-sm text-muted-foreground py-8 text-center">Nenhum título a vencer nos próximos dias.</p>
-                ) : (
-                  aVencerFuturo.map((t) => {
-                    const company = companies.find((c) => c.id === t.company_id);
-                    return (
-                      <Link key={t.id} to="/transacoes" search={{ editId: t.id }} className="flex items-center justify-between py-2 border-b last:border-0 hover:bg-accent/20 px-1 rounded transition-colors cursor-pointer">
-                        <div className="min-w-0 pr-2">
-                          <p className="text-sm font-medium truncate">{t.description}</p>
-                          {company && (
-                            <p className="text-xs text-muted-foreground flex items-center gap-1.5 mt-0.5">
-                              <span className="size-1.5 rounded-full shrink-0" style={{ background: company.color }} />
-                              <span className="truncate">{company.name}</span>
-                            </p>
-                          )}
-                          <p className="text-xs text-muted-foreground mt-0.5">
-                            Vence {formatDate(t.due_date)}
-                          </p>
-                        </div>
-                        <div className="text-right shrink-0">
-                          <p className="text-sm font-medium tabular">{formatBRL(t.amount)}</p>
-                          <Badge variant="secondary" className="text-[10px] mt-0.5">
-                            pendente
-                          </Badge>
-                        </div>
-                      </Link>
-                    );
-                  })
-                )}
-              </TabsContent>
+            <CardContent className="h-72 min-w-0">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={Object.entries(
+                      monthPaid
+                        .filter((t) => t.type === "saida")
+                        .reduce<Record<string, number>>((acc, t) => {
+                          const k = t.category_id ?? "Outros";
+                          acc[k] = (acc[k] ?? 0) + Number(t.amount);
+                          return acc;
+                        }, {}),
+                    ).map(([name, value]) => ({ name, value }))}
+                    dataKey="value"
+                    innerRadius={50}
+                    outerRadius={90}
+                  >
+                    {["chart-1", "chart-2", "chart-3", "chart-4", "chart-5"].map((_, i) => (
+                      <Cell key={i} fill={`var(--chart-${(i % 5) + 1})`} />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(v: number) => formatBRL(v)} contentStyle={{ background: "var(--popover)", border: "1px solid var(--border)" }} />
+                </PieChart>
+              </ResponsiveContainer>
             </CardContent>
-          </Tabs>
-        </Card>
+          </Card>
+        </div>
+
+        <div className="order-4 lg:order-3 contents lg:grid lg:grid-cols-2 gap-4 items-stretch">
+          <Card className="order-4 lg:order-none flex flex-col h-full">
+            <CardHeader>
+              <CardTitle className="text-base font-semibold">Últimas transações</CardTitle>
+            </CardHeader>
+            <CardContent className="flex-1 space-y-2 overflow-y-auto max-h-[480px]">
+              {recent.length === 0 && <p className="text-sm text-muted-foreground py-6 text-center">Sem transações ainda.</p>}
+              {recent.map((t) => {
+                const st = statusLabel(t.status, t.due_date);
+                const company = companies.find((c) => c.id === t.company_id);
+                return (
+                  <Link key={t.id} to="/transacoes" search={{ editId: t.id }} className="flex items-center justify-between py-2 border-b last:border-0 hover:bg-accent/20 px-1 rounded transition-colors cursor-pointer">
+                    <div className="min-w-0 pr-2">
+                      <p className="text-sm font-medium truncate">{t.description}</p>
+                      {company && (
+                        <p className="text-xs text-muted-foreground flex items-center gap-1.5 mt-0.5">
+                          <span className="size-1.5 rounded-full shrink-0" style={{ background: company.color }} />
+                          <span className="truncate">{company.name}</span>
+                        </p>
+                      )}
+                      <p className="text-xs text-muted-foreground mt-0.5">{formatDate(t.due_date)}</p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className={`text-sm font-medium tabular ${t.type === "entrada" ? "text-success" : "text-destructive"}`}>
+                        {t.type === "entrada" ? "+" : "-"} {formatBRL(t.amount)}
+                      </p>
+                      <Badge variant={st === "pago" ? "default" : st === "atrasado" ? "destructive" : "secondary"} className="text-[10px]">
+                        {st}
+                      </Badge>
+                    </div>
+                  </Link>
+                );
+              })}
+            </CardContent>
+          </Card>
+
+          <Card className="order-1 lg:order-none flex flex-col h-full">
+            <Tabs defaultValue={vencidos.length > 0 ? "vencidos" : aVencerHoje.length > 0 ? "hoje" : "a_vencer"} className="flex flex-col h-full">
+              <CardHeader className="pb-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <CardTitle className="text-base font-semibold whitespace-nowrap shrink-0">Próximos vencimentos</CardTitle>
+                  <TabsList className="h-8 p-1 w-full sm:w-auto overflow-x-auto justify-start sm:justify-center shrink-0">
+                    <TabsTrigger value="vencidos" className="text-xs px-2.5 h-6 shrink-0">
+                      Vencidos ({vencidos.length})
+                    </TabsTrigger>
+                    <TabsTrigger value="hoje" className="text-xs px-2.5 h-6 shrink-0">
+                      A vencer hoje ({aVencerHoje.length})
+                    </TabsTrigger>
+                    <TabsTrigger value="a_vencer" className="text-xs px-2.5 h-6 shrink-0">
+                      A vencer ({aVencerFuturo.length})
+                    </TabsTrigger>
+                  </TabsList>
+                </div>
+              </CardHeader>
+
+              <CardContent className="pt-2 flex-1 overflow-y-auto min-h-[480px] sm:min-h-[360px] max-h-[580px] sm:max-h-[480px] pr-1">
+                <TabsContent value="vencidos" className="mt-0 space-y-2">
+                  {vencidos.length === 0 ? (
+                    <p className="text-sm text-muted-foreground py-8 text-center">Nenhum título vencido.</p>
+                  ) : (
+                    vencidos.map((t) => {
+                      const daysOverdue = getDaysOverdue(t.due_date);
+                      const company = companies.find((c) => c.id === t.company_id);
+                      return (
+                        <Link key={t.id} to="/transacoes" search={{ editId: t.id }} className="flex items-center justify-between py-2 border-b last:border-0 hover:bg-accent/20 px-1 rounded transition-colors cursor-pointer">
+                          <div className="min-w-0 pr-2">
+                            <p className="text-sm font-medium truncate">{t.description}</p>
+                            {company && (
+                              <p className="text-xs text-muted-foreground flex items-center gap-1.5 mt-0.5">
+                                <span className="size-1.5 rounded-full shrink-0" style={{ background: company.color }} />
+                                <span className="truncate">{company.name}</span>
+                              </p>
+                            )}
+                            <p className="text-xs text-destructive font-medium mt-0.5">
+                              Venceu {formatDate(t.due_date)} • {daysOverdue} {daysOverdue === 1 ? "dia" : "dias"} em atraso
+                            </p>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <p className="text-sm font-medium tabular">{formatBRL(t.amount)}</p>
+                            <Badge variant="destructive" className="text-[10px] mt-0.5">
+                              atrasado
+                            </Badge>
+                          </div>
+                        </Link>
+                      );
+                    })
+                  )}
+                </TabsContent>
+
+                <TabsContent value="hoje" className="mt-0 space-y-2">
+                  {aVencerHoje.length === 0 ? (
+                    <p className="text-sm text-muted-foreground py-8 text-center">Nenhum título a vencer hoje.</p>
+                  ) : (
+                    aVencerHoje.map((t) => {
+                      const company = companies.find((c) => c.id === t.company_id);
+                      return (
+                        <Link key={t.id} to="/transacoes" search={{ editId: t.id }} className="flex items-center justify-between py-2 border-b last:border-0 hover:bg-accent/20 px-1 rounded transition-colors cursor-pointer">
+                          <div className="min-w-0 pr-2">
+                            <p className="text-sm font-medium truncate">{t.description}</p>
+                            {company && (
+                              <p className="text-xs text-muted-foreground flex items-center gap-1.5 mt-0.5">
+                                <span className="size-1.5 rounded-full shrink-0" style={{ background: company.color }} />
+                                <span className="truncate">{company.name}</span>
+                              </p>
+                            )}
+                            <p className="text-xs text-amber-600 dark:text-amber-400 font-medium mt-0.5">
+                              Vence hoje ({formatDate(t.due_date)})
+                            </p>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <p className="text-sm font-medium tabular">{formatBRL(t.amount)}</p>
+                            <Badge variant="secondary" className="text-[10px] bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/20 mt-0.5">
+                              hoje
+                            </Badge>
+                          </div>
+                        </Link>
+                      );
+                    })
+                  )}
+                </TabsContent>
+
+                <TabsContent value="a_vencer" className="mt-0 space-y-2">
+                  {aVencerFuturo.length === 0 ? (
+                    <p className="text-sm text-muted-foreground py-8 text-center">Nenhum título a vencer nos próximos dias.</p>
+                  ) : (
+                    aVencerFuturo.map((t) => {
+                      const company = companies.find((c) => c.id === t.company_id);
+                      return (
+                        <Link key={t.id} to="/transacoes" search={{ editId: t.id }} className="flex items-center justify-between py-2 border-b last:border-0 hover:bg-accent/20 px-1 rounded transition-colors cursor-pointer">
+                          <div className="min-w-0 pr-2">
+                            <p className="text-sm font-medium truncate">{t.description}</p>
+                            {company && (
+                              <p className="text-xs text-muted-foreground flex items-center gap-1.5 mt-0.5">
+                                <span className="size-1.5 rounded-full shrink-0" style={{ background: company.color }} />
+                                <span className="truncate">{company.name}</span>
+                              </p>
+                            )}
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              Vence {formatDate(t.due_date)}
+                            </p>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <p className="text-sm font-medium tabular">{formatBRL(t.amount)}</p>
+                            <Badge variant="secondary" className="text-[10px] mt-0.5">
+                              pendente
+                            </Badge>
+                          </div>
+                        </Link>
+                      );
+                    })
+                  )}
+                </TabsContent>
+              </CardContent>
+            </Tabs>
+          </Card>
+        </div>
       </div>
         </>
       )}
