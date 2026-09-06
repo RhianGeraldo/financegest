@@ -20,16 +20,16 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Plus, Search, Trash2, CheckCircle2, Filter, Edit2, Paperclip, ExternalLink } from "lucide-react";
+import { Plus, Search, Trash2, CheckCircle2, Filter, Edit2, Paperclip, ExternalLink, FileText, X } from "lucide-react";
 import { toast } from "sonner";
 
-async function uploadReceiptFile(file: File, txId: string): Promise<string | null> {
+async function uploadTransactionFile(file: File, txId: string, prefix: "invoice" | "receipt" = "receipt"): Promise<string | null> {
   try {
     const ext = file.name.split(".").pop() || "png";
-    const path = `${txId}/${Date.now()}.${ext}`;
+    const path = `${txId}/${prefix}_${Date.now()}.${ext}`;
     const { error: uploadError } = await supabase.storage.from("receipts").upload(path, file, { upsert: true });
     if (uploadError) {
-      console.warn("Storage upload warn (falling back to DataURL if storage unavailable):", uploadError.message);
+      console.warn(`Storage upload warn for ${prefix} (falling back to DataURL if storage unavailable):`, uploadError.message);
       return new Promise((resolve) => {
         const reader = new FileReader();
         reader.onloadend = () => resolve(reader.result as string);
@@ -40,16 +40,26 @@ async function uploadReceiptFile(file: File, txId: string): Promise<string | nul
     const { data: publicUrlData } = supabase.storage.from("receipts").getPublicUrl(path);
     return publicUrlData.publicUrl;
   } catch (err: any) {
-    console.error("Erro ao enviar comprovante:", err);
+    console.error(`Erro ao enviar ${prefix}:`, err);
     return null;
   }
 }
+
+export const uploadReceiptFile = (file: File, txId: string) => uploadTransactionFile(file, txId, "receipt");
 
 export function getReceiptUrl(t?: { receipt_url?: string | null; notes?: string | null } | null): string | null {
   if (!t) return null;
   if (t.receipt_url) return t.receipt_url;
   if (!t.notes) return null;
   const match = t.notes.match(/\[Comprovante\]:\s*(https?:\/\/[^\s\n]+)/);
+  return match ? match[1] : null;
+}
+
+export function getInvoiceUrl(t?: { invoice_url?: string | null; notes?: string | null } | null): string | null {
+  if (!t) return null;
+  if (t.invoice_url) return t.invoice_url;
+  if (!t.notes) return null;
+  const match = t.notes.match(/\[Boleto\]:\s*(https?:\/\/[^\s\n]+)/);
   return match ? match[1] : null;
 }
 
@@ -98,10 +108,20 @@ function TransacoesPage() {
     queryFn: async () => {
       let q = supabase
         .from("transactions")
-        .select("id, company_id, type, description, amount, category_id, cost_center_id, bank_account_id, due_date, paid_date, status, notes, created_by, paid_by, receipt_url, created_at")
+        .select("id, company_id, type, description, amount, category_id, cost_center_id, bank_account_id, due_date, paid_date, status, notes, created_by, paid_by, receipt_url, invoice_url, created_at")
         .order("due_date", { ascending: false });
       q = applyCompanyFilter(q, selectedCompanyId, companies);
       const { data, error } = await q;
+      if (error && (error.message.includes("invoice_url") || (error as any).code === "PGRST204" || (error as any).code === "42703")) {
+        let fallbackQ = supabase
+          .from("transactions")
+          .select("id, company_id, type, description, amount, category_id, cost_center_id, bank_account_id, due_date, paid_date, status, notes, created_by, paid_by, receipt_url, created_at")
+          .order("due_date", { ascending: false });
+        fallbackQ = applyCompanyFilter(fallbackQ, selectedCompanyId, companies);
+        const { data: fallbackData, error: fallbackError } = await fallbackQ;
+        if (fallbackError) throw fallbackError;
+        return (fallbackData ?? []).map((t: any) => ({ ...t, invoice_url: null }));
+      }
       if (error) throw error;
       return data ?? [];
     },
@@ -172,7 +192,8 @@ function TransacoesPage() {
   });
 
   const [markPaidFile, setMarkPaidFile] = useState<File | null>(null);
-  const [previewReceiptUrl, setPreviewReceiptUrl] = useState<string | null>(null);
+  const [previewFile, setPreviewFile] = useState<{ url: string; title: string } | null>(null);
+  const openPreview = (url: string, title = "Visualizar Documento") => setPreviewFile({ url, title });
 
   const submitMarkPaid = async () => {
     if (!markPaidId) return;
@@ -181,7 +202,7 @@ function TransacoesPage() {
     
     let receiptUrl: string | null = null;
     if (markPaidFile) {
-      receiptUrl = await uploadReceiptFile(markPaidFile, markPaidId);
+      receiptUrl = await uploadTransactionFile(markPaidFile, markPaidId, "receipt");
     }
 
     const payload: any = {
@@ -247,12 +268,38 @@ function TransacoesPage() {
 
       {/* Mark Paid Dialog */}
       <Dialog open={!!markPaidId} onOpenChange={(o) => { if (!o) { setMarkPaidId(null); setMarkPaidFile(null); } }}>
-        <DialogContent className="sm:max-w-sm">
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Confirmar pagamento</DialogTitle>
             <DialogDescription className="sr-only">Selecione a data e comprovante do pagamento</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
+            {(() => {
+              const currentTx = txs?.find((t) => t.id === markPaidId);
+              const invoiceUrl = getInvoiceUrl(currentTx);
+              if (!invoiceUrl) return null;
+              return (
+                <div className="p-3 bg-muted/40 rounded-lg border flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-2">
+                    <FileText className="size-4 text-primary" />
+                    <div>
+                      <p className="font-medium text-foreground">Boleto / Fatura anexo</p>
+                      <p className="text-muted-foreground">Consulte o documento para conferir ou pagar</p>
+                    </div>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-8 text-xs gap-1.5"
+                    onClick={() => openPreview(invoiceUrl, "Boleto / Fatura")}
+                  >
+                    <ExternalLink className="size-3" /> Visualizar
+                  </Button>
+                </div>
+              );
+            })()}
+
             <div className="space-y-2">
               <Label>Data do Pagamento</Label>
               <DatePicker value={markPaidDate} onChange={(v) => setMarkPaidDate(v)} />
@@ -273,15 +320,15 @@ function TransacoesPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Receipt Preview Dialog */}
-      <Dialog open={!!previewReceiptUrl} onOpenChange={(o) => !o && setPreviewReceiptUrl(null)}>
-        <DialogContent className="sm:max-w-xl max-h-[90vh] flex flex-col p-4">
+      {/* Unified File Preview Dialog */}
+      <Dialog open={!!previewFile} onOpenChange={(o) => !o && setPreviewFile(null)}>
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] flex flex-col p-4">
           <DialogHeader className="pb-2">
             <DialogTitle className="text-base flex items-center justify-between">
-              <span>Comprovante de Pagamento</span>
-              {previewReceiptUrl && (
+              <span>{previewFile?.title || "Visualização do Arquivo"}</span>
+              {previewFile?.url && (
                 <a
-                  href={previewReceiptUrl}
+                  href={previewFile.url}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-xs text-primary font-normal flex items-center gap-1 hover:underline mr-6"
@@ -290,17 +337,17 @@ function TransacoesPage() {
                 </a>
               )}
             </DialogTitle>
-            <DialogDescription className="sr-only">Visualização do comprovante de pagamento anexado</DialogDescription>
+            <DialogDescription className="sr-only">Visualização do documento anexo</DialogDescription>
           </DialogHeader>
           <div className="flex-1 overflow-auto flex items-center justify-center min-h-[300px] bg-muted/20 rounded-md p-2 border">
-            {previewReceiptUrl && (
-              previewReceiptUrl.endsWith(".pdf") || previewReceiptUrl.includes("application/pdf") ? (
-                <iframe src={previewReceiptUrl} className="w-full h-[500px] rounded border-0" title="Comprovante PDF" />
+            {previewFile?.url && (
+              previewFile.url.endsWith(".pdf") || previewFile.url.includes("application/pdf") ? (
+                <iframe src={previewFile.url} className="w-full h-[550px] rounded border-0" title={previewFile.title} />
               ) : (
                 <img
-                  src={previewReceiptUrl}
-                  alt="Comprovante de Pagamento"
-                  className="max-h-[500px] max-w-full object-contain rounded shadow-sm"
+                  src={previewFile.url}
+                  alt={previewFile.title}
+                  className="max-h-[550px] max-w-full object-contain rounded shadow-sm"
                 />
               )
             )}
@@ -317,7 +364,14 @@ function TransacoesPage() {
                   <DialogTrigger asChild>
                     <Button className="flex-1 sm:flex-none" onClick={() => setEditData(null)}><Plus className="size-4 mr-1" /> Nova transação</Button>
                   </DialogTrigger>
-                  {open && <TransactionDialog initialData={editData} onClose={() => { setOpen(false); setEditData(null); }} onPreviewReceipt={(url) => setPreviewReceiptUrl(url)} />}
+                  {open && (
+                    <TransactionDialog
+                      initialData={editData}
+                      onClose={() => { setOpen(false); setEditData(null); }}
+                      onPreviewFile={(url, title) => openPreview(url, title)}
+                      onPreviewReceipt={(url) => openPreview(url, "Comprovante de Pagamento")}
+                    />
+                  )}
                 </Dialog>
               )}
               <Button className="flex-1 sm:flex-none" variant={showFilters ? "secondary" : "outline"} onClick={() => setShowFilters(!showFilters)}>
@@ -415,15 +469,26 @@ function TransacoesPage() {
                           Baixa por: <span className="font-medium text-foreground">{profiles?.find((p: any) => p.id === t.paid_by)?.full_name || "Usuário"}</span> em {formatDateTime(t.paid_date)}
                         </p>
                       )}
-                      {getReceiptUrl(t) && (
-                        <button
-                          type="button"
-                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); setPreviewReceiptUrl(getReceiptUrl(t)); }}
-                          className="text-xs text-primary font-medium flex items-center gap-1 mt-1 hover:underline text-left"
-                        >
-                          <Paperclip className="size-3" /> Ver comprovante
-                        </button>
-                      )}
+                      <div className="flex flex-wrap items-center gap-2 mt-1.5">
+                        {getInvoiceUrl(t) && (
+                          <button
+                            type="button"
+                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); openPreview(getInvoiceUrl(t)!, "Boleto / Fatura"); }}
+                            className="text-xs text-blue-600 dark:text-blue-400 font-medium flex items-center gap-1 hover:underline text-left bg-blue-500/10 px-2 py-0.5 rounded"
+                          >
+                            <FileText className="size-3" /> Boleto/Fatura
+                          </button>
+                        )}
+                        {getReceiptUrl(t) && (
+                          <button
+                            type="button"
+                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); openPreview(getReceiptUrl(t)!, "Comprovante de Pagamento"); }}
+                            className="text-xs text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1 hover:underline text-left bg-emerald-500/10 px-2 py-0.5 rounded"
+                          >
+                            <Paperclip className="size-3" /> Comprovante
+                          </button>
+                        )}
+                      </div>
                     </div>
                     <div className="text-right shrink-0 flex flex-col items-end">
                       <p className={`text-sm font-semibold tabular ${t.type === "entrada" ? "text-success" : "text-destructive"}`}>
@@ -499,6 +564,16 @@ function TransacoesPage() {
                             {company.name}
                           </div>
                         )}
+                        {getInvoiceUrl(t) && (
+                          <button
+                            type="button"
+                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); openPreview(getInvoiceUrl(t)!, "Boleto / Fatura"); }}
+                            className="text-xs text-blue-600 dark:text-blue-400 font-medium flex items-center gap-1 mt-1 hover:underline text-left"
+                            title="Visualizar Boleto / Fatura"
+                          >
+                            <FileText className="size-3" /> Boleto/Fatura
+                          </button>
+                        )}
                       </td>
                       <td className="py-3 px-2">
                         <Badge variant={t.type === "entrada" ? "default" : "secondary"}>
@@ -522,9 +597,9 @@ function TransacoesPage() {
                             {getReceiptUrl(t) && (
                               <button
                                 type="button"
-                                onClick={(e) => { e.preventDefault(); e.stopPropagation(); setPreviewReceiptUrl(getReceiptUrl(t)); }}
-                                className="text-xs text-primary font-medium flex items-center gap-1 mt-0.5 hover:underline text-left"
-                                title="Ver Comprovante"
+                                onClick={(e) => { e.preventDefault(); e.stopPropagation(); openPreview(getReceiptUrl(t)!, "Comprovante de Pagamento"); }}
+                                className="text-xs text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1 mt-0.5 hover:underline text-left"
+                                title="Ver Comprovante de Pagamento"
                               >
                                 <Paperclip className="size-3" /> Comprovante
                               </button>
@@ -598,7 +673,17 @@ function TransacoesPage() {
   );
 }
 
-function TransactionDialog({ onClose, initialData, onPreviewReceipt }: { onClose: () => void; initialData?: any; onPreviewReceipt?: (url: string) => void }) {
+function TransactionDialog({
+  onClose,
+  initialData,
+  onPreviewFile,
+  onPreviewReceipt,
+}: {
+  onClose: () => void;
+  initialData?: any;
+  onPreviewFile?: (url: string, title?: string) => void;
+  onPreviewReceipt?: (url: string) => void;
+}) {
   const { companies, selectedCompanyId, user } = useAuth();
   const qc = useQueryClient();
 
@@ -653,13 +738,24 @@ function TransactionDialog({ onClose, initialData, onPreviewReceipt }: { onClose
     };
   });
 
+  const [invoiceFile, setInvoiceFile] = useState<File | null>(null);
+  const [currentInvoiceUrl, setCurrentInvoiceUrl] = useState<string | null>(getInvoiceUrl(initialData));
+  const [removeInvoice, setRemoveInvoice] = useState(false);
+
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
-  const [currentReceiptUrl, setCurrentReceiptUrl] = useState<string | null>(initialData?.receipt_url ?? null);
+  const [currentReceiptUrl, setCurrentReceiptUrl] = useState<string | null>(getReceiptUrl(initialData));
+  const [removeReceipt, setRemoveReceipt] = useState(false);
 
   useEffect(() => {
     if (initialData) {
+      setCurrentInvoiceUrl(getInvoiceUrl(initialData));
+      setInvoiceFile(null);
+      setRemoveInvoice(false);
+
       setCurrentReceiptUrl(getReceiptUrl(initialData));
       setReceiptFile(null);
+      setRemoveReceipt(false);
+
       setForm({
         company_id: initialData.company_id ?? getSelectedCompanyId(),
         type: initialData.type ?? "saida",
@@ -676,8 +772,14 @@ function TransactionDialog({ onClose, initialData, onPreviewReceipt }: { onClose
         amountType: "total" as "total" | "parcela",
       });
     } else {
+      setCurrentInvoiceUrl(null);
+      setInvoiceFile(null);
+      setRemoveInvoice(false);
+
       setCurrentReceiptUrl(null);
       setReceiptFile(null);
+      setRemoveReceipt(false);
+
       setForm({
         company_id: getSelectedCompanyId(),
         type: "saida" as "entrada" | "saida",
@@ -762,10 +864,16 @@ function TransactionDialog({ onClose, initialData, onPreviewReceipt }: { onClose
     setSaving(true);
     
     if (initialData) {
-      let finalReceiptUrl = currentReceiptUrl;
-      if (receiptFile && initialData.id) {
-        const uploaded = await uploadReceiptFile(receiptFile, initialData.id);
-        if (uploaded) finalReceiptUrl = uploaded;
+      let finalInvoiceUrl = removeInvoice ? null : currentInvoiceUrl;
+      if (invoiceFile && initialData.id) {
+        const uploadedInvoice = await uploadTransactionFile(invoiceFile, initialData.id, "invoice");
+        if (uploadedInvoice) finalInvoiceUrl = uploadedInvoice;
+      }
+
+      let finalReceiptUrl = (form.status === "pago" && !removeReceipt) ? currentReceiptUrl : null;
+      if (receiptFile && initialData.id && form.status === "pago") {
+        const uploadedReceipt = await uploadTransactionFile(receiptFile, initialData.id, "receipt");
+        if (uploadedReceipt) finalReceiptUrl = uploadedReceipt;
       }
 
       const payload: any = {
@@ -780,17 +888,26 @@ function TransactionDialog({ onClose, initialData, onPreviewReceipt }: { onClose
           : null,
         paid_by: form.status === "pago" ? (initialData.status === "pago" ? initialData.paid_by : user?.id) : null,
         receipt_url: form.status === "pago" ? finalReceiptUrl : null,
+        invoice_url: finalInvoiceUrl,
         category_id: form.category_id !== "none" ? form.category_id : null,
         cost_center_id: form.cost_center_id !== "none" ? form.cost_center_id : null,
         notes: form.notes || null,
       };
       let { error } = await supabase.from("transactions").update(payload).eq("id", initialData.id);
       
-      if (error && (error.message.includes("receipt_url") || error.message.includes("schema cache"))) {
-        delete payload.receipt_url;
-        if (finalReceiptUrl) {
+      if (error && (error.message.includes("invoice_url") || error.message.includes("receipt_url") || error.message.includes("schema cache"))) {
+        let notesExtra = "";
+        if (error.message.includes("invoice_url")) {
+          delete payload.invoice_url;
+          if (finalInvoiceUrl) notesExtra += `[Boleto]: ${finalInvoiceUrl}\n`;
+        }
+        if (error.message.includes("receipt_url")) {
+          delete payload.receipt_url;
+          if (finalReceiptUrl) notesExtra += `[Comprovante]: ${finalReceiptUrl}\n`;
+        }
+        if (notesExtra) {
           const existingNotes = form.notes ? `${form.notes}\n` : "";
-          payload.notes = `${existingNotes}[Comprovante]: ${finalReceiptUrl}`;
+          payload.notes = `${existingNotes}${notesExtra}`.trim();
         }
         const retry = await supabase.from("transactions").update(payload).eq("id", initialData.id);
         error = retry.error;
@@ -800,10 +917,15 @@ function TransactionDialog({ onClose, initialData, onPreviewReceipt }: { onClose
       if (error) return toast.error("Erro", { description: error.message });
       toast.success("Transação atualizada");
     } else {
+      const tempId = crypto.randomUUID();
+      let newInvoiceUrl: string | null = null;
+      if (invoiceFile) {
+        newInvoiceUrl = await uploadTransactionFile(invoiceFile, tempId, "invoice");
+      }
+
       let newReceiptUrl: string | null = null;
       if (receiptFile && form.status === "pago") {
-        const tempId = crypto.randomUUID();
-        newReceiptUrl = await uploadReceiptFile(receiptFile, tempId);
+        newReceiptUrl = await uploadTransactionFile(receiptFile, tempId, "receipt");
       }
 
       const payloads: any[] = [];
@@ -817,6 +939,7 @@ function TransactionDialog({ onClose, initialData, onPreviewReceipt }: { onClose
           status: i === 0 ? form.status : "pendente",
           paid_date: i === 0 && form.status === "pago" ? todayISO() + new Date().toISOString().slice(10) : null,
           paid_by: i === 0 && form.status === "pago" ? user?.id : null,
+          invoice_url: newInvoiceUrl,
           receipt_url: i === 0 && form.status === "pago" ? newReceiptUrl : null,
           created_by: user?.id,
           category_id: form.category_id !== "none" ? form.category_id : null,
@@ -827,13 +950,17 @@ function TransactionDialog({ onClose, initialData, onPreviewReceipt }: { onClose
 
       let { error } = await supabase.from("transactions").insert(payloads);
 
-      if (error && (error.message.includes("receipt_url") || error.message.includes("schema cache"))) {
+      if (error && (error.message.includes("invoice_url") || error.message.includes("receipt_url") || error.message.includes("schema cache"))) {
         const fallbackPayloads = payloads.map((p) => {
           const cp = { ...p };
-          if (cp.receipt_url) {
+          let notesExtra = "";
+          if (cp.invoice_url) notesExtra += `[Boleto]: ${cp.invoice_url}\n`;
+          if (cp.receipt_url) notesExtra += `[Comprovante]: ${cp.receipt_url}\n`;
+          if (notesExtra) {
             const existingNotes = cp.notes ? `${cp.notes}\n` : "";
-            cp.notes = `${existingNotes}[Comprovante]: ${cp.receipt_url}`;
+            cp.notes = `${existingNotes}${notesExtra}`.trim();
           }
+          delete cp.invoice_url;
           delete cp.receipt_url;
           return cp;
         });
@@ -930,32 +1057,112 @@ function TransactionDialog({ onClose, initialData, onPreviewReceipt }: { onClose
             <DatePicker value={form.due_date} onChange={(v) => setForm({ ...form, due_date: v })} />
           </div>
           {form.status === "pago" && (
-            <>
-              <div className="space-y-1.5">
-                <Label>Data de Pagamento</Label>
-                <DatePicker value={form.paid_date} onChange={(v) => setForm({ ...form, paid_date: v })} />
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label>Data de Pagamento</Label>
+              <DatePicker value={form.paid_date} onChange={(v) => setForm({ ...form, paid_date: v })} />
+            </div>
+          )}
+
+          {/* Anexo 1: Boleto / Fatura / Documento da Despesa (Sempre visível) */}
+          <div className="col-span-1 sm:col-span-2 space-y-1.5 p-3 rounded-lg bg-muted/30 border">
+            <div className="flex items-center justify-between">
+              <Label className="text-xs font-semibold flex items-center gap-1.5">
+                <FileText className="size-3.5 text-primary" />
+                Boleto / Fatura / Documento (opcional)
+              </Label>
+              {currentInvoiceUrl && !removeInvoice && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 text-[11px] text-destructive hover:bg-destructive/10 px-2"
+                  onClick={() => setRemoveInvoice(true)}
+                >
+                  <Trash2 className="size-3 mr-1" /> Remover documento
+                </Button>
+              )}
+            </div>
+
+            {currentInvoiceUrl && !removeInvoice ? (
+              <div className="flex items-center justify-between bg-card p-2 rounded border text-xs">
+                <span className="text-muted-foreground truncate max-w-[240px]">Documento anexado</span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-xs gap-1"
+                  onClick={() => {
+                    if (onPreviewFile) onPreviewFile(currentInvoiceUrl, "Boleto / Fatura");
+                    else if (onPreviewReceipt) onPreviewReceipt(currentInvoiceUrl);
+                  }}
+                >
+                  <ExternalLink className="size-3" /> Visualizar
+                </Button>
               </div>
-              <div className="col-span-1 sm:col-span-2 space-y-1.5 mt-1">
-                <Label>Comprovante de Pagamento (opcional)</Label>
-                {currentReceiptUrl && (
-                  <div className="text-xs flex items-center gap-2 mb-1">
-                    <button
-                      type="button"
-                      onClick={() => onPreviewReceipt?.(currentReceiptUrl)}
-                      className="text-primary hover:underline flex items-center gap-1 font-medium text-left"
-                    >
-                      <Paperclip className="size-3.5" /> Visualizar comprovante anexo
-                    </button>
-                  </div>
+            ) : (
+              <Input
+                type="file"
+                accept="image/*,application/pdf"
+                onChange={(e) => {
+                  setInvoiceFile(e.target.files?.[0] || null);
+                  setRemoveInvoice(false);
+                }}
+                className="h-9 text-xs"
+              />
+            )}
+          </div>
+
+          {/* Anexo 2: Comprovante de Pagamento (Visível apenas se status for "pago") */}
+          {form.status === "pago" && (
+            <div className="col-span-1 sm:col-span-2 space-y-1.5 p-3 rounded-lg bg-emerald-500/5 border border-emerald-500/20">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-semibold flex items-center gap-1.5 text-emerald-700 dark:text-emerald-400">
+                  <Paperclip className="size-3.5" />
+                  Comprovante de Pagamento (opcional)
+                </Label>
+                {currentReceiptUrl && !removeReceipt && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 text-[11px] text-destructive hover:bg-destructive/10 px-2"
+                    onClick={() => setRemoveReceipt(true)}
+                  >
+                    <Trash2 className="size-3 mr-1" /> Remover comprovante
+                  </Button>
                 )}
+              </div>
+
+              {currentReceiptUrl && !removeReceipt ? (
+                <div className="flex items-center justify-between bg-card p-2 rounded border text-xs">
+                  <span className="text-muted-foreground truncate max-w-[240px]">Comprovante anexado</span>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-7 text-xs gap-1"
+                    onClick={() => {
+                      if (onPreviewFile) onPreviewFile(currentReceiptUrl, "Comprovante de Pagamento");
+                      else if (onPreviewReceipt) onPreviewReceipt(currentReceiptUrl);
+                    }}
+                  >
+                    <ExternalLink className="size-3" /> Visualizar
+                  </Button>
+                </div>
+              ) : (
                 <Input
                   type="file"
                   accept="image/*,application/pdf"
-                  onChange={(e) => setReceiptFile(e.target.files?.[0] || null)}
+                  onChange={(e) => {
+                    setReceiptFile(e.target.files?.[0] || null);
+                    setRemoveReceipt(false);
+                  }}
+                  className="h-9 text-xs"
                 />
-              </div>
-            </>
+              )}
+            </div>
           )}
+
           {initialData && (
             <div className="col-span-1 sm:col-span-2 space-y-1.5 mt-2 pt-2 border-t border-dashed">
               <Label className="text-muted-foreground text-xs block">

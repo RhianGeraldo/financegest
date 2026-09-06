@@ -220,6 +220,7 @@ export type Database = {
           description: string
           due_date: string
           id: string
+          invoice_url: string | null
           notes: string | null
           paid_by: string | null
           paid_date: string | null
@@ -239,6 +240,7 @@ export type Database = {
           description: string
           due_date: string
           id?: string
+          invoice_url?: string | null
           notes?: string | null
           paid_by?: string | null
           paid_date?: string | null
@@ -258,6 +260,7 @@ export type Database = {
           description?: string
           due_date?: string
           id?: string
+          invoice_url?: string | null
           notes?: string | null
           paid_by?: string | null
           paid_date?: string | null
