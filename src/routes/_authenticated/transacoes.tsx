@@ -20,7 +20,9 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Plus, Search, Trash2, CheckCircle2, Filter, Edit2, Paperclip, ExternalLink, FileText, X } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { HoverCard, HoverCardTrigger, HoverCardContent } from "@/components/ui/hover-card";
+import { Plus, Search, Trash2, CheckCircle2, Filter, Edit2, Paperclip, ExternalLink, FileText, X, Eye } from "lucide-react";
 import { toast } from "sonner";
 
 async function uploadTransactionFile(file: File, txId: string, prefix: "invoice" | "receipt" = "receipt"): Promise<string | null> {
@@ -61,6 +63,101 @@ export function getInvoiceUrl(t?: { invoice_url?: string | null; notes?: string 
   if (!t.notes) return null;
   const match = t.notes.match(/\[Boleto\]:\s*(https?:\/\/[^\s\n]+)/);
   return match ? match[1] : null;
+}
+
+function AttachmentBadge({
+  url,
+  type,
+  onOpen,
+}: {
+  url: string;
+  type: "invoice" | "receipt";
+  onOpen: (url: string, title: string) => void;
+}) {
+  const isInvoice = type === "invoice";
+  const title = isInvoice ? "Boleto / Fatura" : "Comprovante de Pagamento";
+  const isPdf = url.toLowerCase().includes(".pdf") || url.includes("application/pdf");
+
+  return (
+    <HoverCard openDelay={150} closeDelay={150}>
+      <HoverCardTrigger asChild>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onOpen(url, title);
+          }}
+          className={cn(
+            "inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium border transition-all cursor-pointer shadow-2xs hover:scale-105 active:scale-95",
+            isInvoice
+              ? "bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100 hover:border-blue-300 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800 dark:hover:bg-blue-900/60"
+              : "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 hover:border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800 dark:hover:bg-emerald-900/60"
+          )}
+          title={`Clique para visualizar ${title}`}
+        >
+          {isInvoice ? <FileText className="size-3 shrink-0" /> : <Paperclip className="size-3 shrink-0" />}
+          <span>{isInvoice ? "Boleto" : "Comprovante"}</span>
+        </button>
+      </HoverCardTrigger>
+      <HoverCardContent side="top" align="center" className="w-64 p-2.5 z-50 shadow-lg">
+        <div className="space-y-2">
+          <div className="flex items-center justify-between border-b pb-1.5 text-xs font-semibold">
+            <span className="flex items-center gap-1.5 text-foreground truncate max-w-[170px]">
+              {isInvoice ? <FileText className="size-3.5 text-blue-600 shrink-0" /> : <CheckCircle2 className="size-3.5 text-emerald-600 shrink-0" />}
+              {title}
+            </span>
+            <span className="text-[10px] text-muted-foreground uppercase font-mono px-1 py-0.5 bg-muted rounded">
+              {isPdf ? "PDF" : "Imagem"}
+            </span>
+          </div>
+          <div
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onOpen(url, title);
+            }}
+            className="w-full h-36 bg-muted/30 rounded border flex items-center justify-center overflow-hidden cursor-pointer hover:opacity-90 transition-opacity relative group"
+          >
+            {isPdf ? (
+              <div className="flex flex-col items-center justify-center p-3 text-center">
+                <FileText className="size-10 text-primary/70 mb-1" />
+                <span className="text-xs font-medium text-foreground">Documento em PDF</span>
+                <span className="text-[10px] text-muted-foreground mt-0.5">Clique para visualizar</span>
+              </div>
+            ) : (
+              <img src={url} alt={title} className="max-h-full max-w-full object-contain" />
+            )}
+            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-medium gap-1">
+              <Eye className="size-3.5" /> Visualizar
+            </div>
+          </div>
+          <div className="flex items-center justify-between text-[11px] pt-0.5">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onOpen(url, title);
+              }}
+              className="text-primary hover:underline font-medium flex items-center gap-1"
+            >
+              <Eye className="size-3" /> Ver em tela cheia
+            </button>
+            <a
+              href={url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-muted-foreground hover:text-foreground flex items-center gap-1"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <ExternalLink className="size-3" /> Nova aba
+            </a>
+          </div>
+        </div>
+      </HoverCardContent>
+    </HoverCard>
+  );
 }
 
 interface TransacoesSearch {
@@ -237,6 +334,64 @@ function TransacoesPage() {
     qc.invalidateQueries({ queryKey: ["tx"] });
   };
 
+  const handleQuickAttachInvoice = async (txId: string, file: File) => {
+    const toastId = toast.loading("Enviando boleto/fatura...");
+    try {
+      const uploadedUrl = await uploadTransactionFile(file, txId, "invoice");
+      if (!uploadedUrl) {
+        toast.error("Não foi possível enviar o arquivo", { id: toastId });
+        return;
+      }
+      let payload: any = { invoice_url: uploadedUrl };
+      let { error } = await supabase.from("transactions").update(payload).eq("id", txId);
+      if (error && (error.message.includes("invoice_url") || error.message.includes("schema cache"))) {
+        const { data: currentTx } = await supabase.from("transactions").select("notes").eq("id", txId).single();
+        const existingNotes = currentTx?.notes ? `${currentTx.notes}\n` : "";
+        payload = { notes: `${existingNotes}[Boleto]: ${uploadedUrl}`.trim() };
+        const retry = await supabase.from("transactions").update(payload).eq("id", txId);
+        error = retry.error;
+      }
+      if (error) {
+        toast.error("Erro ao salvar anexo: " + error.message, { id: toastId });
+        return;
+      }
+      toast.success("Boleto/fatura anexado com sucesso!", { id: toastId });
+      qc.invalidateQueries({ queryKey: ["transactions"] });
+      qc.invalidateQueries({ queryKey: ["tx"] });
+    } catch (err: any) {
+      toast.error("Erro: " + err.message, { id: toastId });
+    }
+  };
+
+  const handleQuickAttachReceipt = async (txId: string, file: File) => {
+    const toastId = toast.loading("Enviando comprovante...");
+    try {
+      const uploadedUrl = await uploadTransactionFile(file, txId, "receipt");
+      if (!uploadedUrl) {
+        toast.error("Não foi possível enviar o arquivo", { id: toastId });
+        return;
+      }
+      let payload: any = { receipt_url: uploadedUrl };
+      let { error } = await supabase.from("transactions").update(payload).eq("id", txId);
+      if (error && (error.message.includes("receipt_url") || error.message.includes("schema cache"))) {
+        const { data: currentTx } = await supabase.from("transactions").select("notes").eq("id", txId).single();
+        const existingNotes = currentTx?.notes ? `${currentTx.notes}\n` : "";
+        payload = { notes: `${existingNotes}[Comprovante]: ${uploadedUrl}`.trim() };
+        const retry = await supabase.from("transactions").update(payload).eq("id", txId);
+        error = retry.error;
+      }
+      if (error) {
+        toast.error("Erro ao salvar comprovante: " + error.message, { id: toastId });
+        return;
+      }
+      toast.success("Comprovante anexado com sucesso!", { id: toastId });
+      qc.invalidateQueries({ queryKey: ["transactions"] });
+      qc.invalidateQueries({ queryKey: ["tx"] });
+    } catch (err: any) {
+      toast.error("Erro: " + err.message, { id: toastId });
+    }
+  };
+
   const remove = async (id: string) => {
     const { error } = await supabase.from("transactions").delete().eq("id", id);
     if (error) return toast.error("Erro", { description: error.message });
@@ -322,10 +477,17 @@ function TransacoesPage() {
 
       {/* Unified File Preview Dialog */}
       <Dialog open={!!previewFile} onOpenChange={(o) => !o && setPreviewFile(null)}>
-        <DialogContent className="sm:max-w-2xl max-h-[90vh] flex flex-col p-4">
-          <DialogHeader className="pb-2">
+        <DialogContent className="sm:max-w-4xl w-[95vw] max-h-[92vh] flex flex-col p-4 sm:p-6">
+          <DialogHeader className="pb-3 border-b">
             <DialogTitle className="text-base flex items-center justify-between">
-              <span>{previewFile?.title || "Visualização do Arquivo"}</span>
+              <span className="flex items-center gap-2">
+                {previewFile?.title?.includes("Boleto") ? (
+                  <FileText className="size-4 text-blue-600 dark:text-blue-400" />
+                ) : (
+                  <Paperclip className="size-4 text-emerald-600 dark:text-emerald-400" />
+                )}
+                {previewFile?.title || "Visualização do Arquivo"}
+              </span>
               {previewFile?.url && (
                 <a
                   href={previewFile.url}
@@ -333,21 +495,21 @@ function TransacoesPage() {
                   rel="noopener noreferrer"
                   className="text-xs text-primary font-normal flex items-center gap-1 hover:underline mr-6"
                 >
-                  <ExternalLink className="size-3" /> Abrir em nova aba
+                  <ExternalLink className="size-3.5" /> Abrir em nova aba
                 </a>
               )}
             </DialogTitle>
             <DialogDescription className="sr-only">Visualização do documento anexo</DialogDescription>
           </DialogHeader>
-          <div className="flex-1 overflow-auto flex items-center justify-center min-h-[300px] bg-muted/20 rounded-md p-2 border">
+          <div className="flex-1 overflow-auto flex items-center justify-center min-h-[350px] max-h-[calc(92vh-130px)] bg-muted/20 rounded-md p-2 border my-2">
             {previewFile?.url && (
-              previewFile.url.endsWith(".pdf") || previewFile.url.includes("application/pdf") ? (
-                <iframe src={previewFile.url} className="w-full h-[550px] rounded border-0" title={previewFile.title} />
+              previewFile.url.toLowerCase().includes(".pdf") || previewFile.url.includes("application/pdf") ? (
+                <iframe src={previewFile.url} className="w-full h-[650px] rounded border-0" title={previewFile.title} />
               ) : (
                 <img
                   src={previewFile.url}
                   alt={previewFile.title}
-                  className="max-h-[550px] max-w-full object-contain rounded shadow-sm"
+                  className="max-h-[650px] max-w-full object-contain rounded shadow-sm"
                 />
               )
             )}
@@ -469,24 +631,72 @@ function TransacoesPage() {
                           Baixa por: <span className="font-medium text-foreground">{profiles?.find((p: any) => p.id === t.paid_by)?.full_name || "Usuário"}</span> em {formatDateTime(t.paid_date)}
                         </p>
                       )}
-                      <div className="flex flex-wrap items-center gap-2 mt-1.5">
+                      <div className="flex flex-wrap items-center gap-2 mt-2 pt-2 border-t border-dashed border-border/40">
                         {getInvoiceUrl(t) && (
-                          <button
+                          <Button
                             type="button"
+                            variant="outline"
+                            size="sm"
                             onClick={(e) => { e.preventDefault(); e.stopPropagation(); openPreview(getInvoiceUrl(t)!, "Boleto / Fatura"); }}
-                            className="text-xs text-blue-600 dark:text-blue-400 font-medium flex items-center gap-1 hover:underline text-left bg-blue-500/10 px-2 py-0.5 rounded"
+                            className="h-7 px-2.5 text-xs font-medium bg-blue-50 hover:bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 dark:hover:bg-blue-900/60 border-blue-200 dark:border-blue-800 gap-1.5"
                           >
-                            <FileText className="size-3" /> Boleto/Fatura
-                          </button>
+                            <FileText className="size-3.5 text-blue-600 dark:text-blue-400" />
+                            <span>Ver Boleto / Fatura</span>
+                          </Button>
                         )}
                         {getReceiptUrl(t) && (
-                          <button
+                          <Button
                             type="button"
+                            variant="outline"
+                            size="sm"
                             onClick={(e) => { e.preventDefault(); e.stopPropagation(); openPreview(getReceiptUrl(t)!, "Comprovante de Pagamento"); }}
-                            className="text-xs text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1 hover:underline text-left bg-emerald-500/10 px-2 py-0.5 rounded"
+                            className="h-7 px-2.5 text-xs font-medium bg-emerald-50 hover:bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-900/60 border-emerald-200 dark:border-emerald-800 gap-1.5"
                           >
-                            <Paperclip className="size-3" /> Comprovante
-                          </button>
+                            <Paperclip className="size-3.5 text-emerald-600 dark:text-emerald-400" />
+                            <span>Ver Comprovante</span>
+                          </Button>
+                        )}
+                        {!getInvoiceUrl(t) && canWrite && (
+                          <label
+                            htmlFor={`mobile-quick-invoice-${t.id}`}
+                            className="inline-flex items-center gap-1.5 px-2.5 h-7 rounded-md text-xs font-medium text-muted-foreground hover:text-foreground bg-muted/40 hover:bg-muted border border-dashed border-border/70 cursor-pointer transition-colors"
+                            title="Anexar boleto ou fatura antes de pagar"
+                          >
+                            <Plus className="size-3.5" />
+                            <span>Anexar Boleto</span>
+                            <input
+                              id={`mobile-quick-invoice-${t.id}`}
+                              type="file"
+                              accept="image/*,application/pdf"
+                              className="sr-only"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) handleQuickAttachInvoice(t.id, file);
+                                e.target.value = "";
+                              }}
+                            />
+                          </label>
+                        )}
+                        {!getReceiptUrl(t) && t.status === "pago" && canWrite && (
+                          <label
+                            htmlFor={`mobile-quick-receipt-${t.id}`}
+                            className="inline-flex items-center gap-1.5 px-2.5 h-7 rounded-md text-xs font-medium text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 bg-emerald-500/10 hover:bg-emerald-500/20 border border-dashed border-emerald-500/30 cursor-pointer transition-colors"
+                            title="Anexar comprovante de pagamento"
+                          >
+                            <Plus className="size-3.5" />
+                            <span>Anexar Comprovante</span>
+                            <input
+                              id={`mobile-quick-receipt-${t.id}`}
+                              type="file"
+                              accept="image/*,application/pdf"
+                              className="sr-only"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) handleQuickAttachReceipt(t.id, file);
+                                e.target.value = "";
+                              }}
+                            />
+                          </label>
                         )}
                       </div>
                     </div>
@@ -537,7 +747,7 @@ function TransacoesPage() {
 
           {/* Desktop Table View */}
           <div className="hidden md:block overflow-x-auto overflow-y-auto max-h-[calc(100vh-240px)] w-full min-w-0">
-            <table className="w-full text-sm relative min-w-[700px]">
+            <table className="w-full text-sm relative min-w-[750px]">
               <thead className="text-xs text-muted-foreground border-b sticky top-0 bg-card z-10 shadow-sm">
                 <tr className="text-left">
                   <th className="py-2 px-2">Descrição</th>
@@ -546,6 +756,7 @@ function TransacoesPage() {
                   <th className="py-2 px-2">Vencimento</th>
                   <th className="py-2 px-2">Pagamento</th>
                   <th className="py-2 px-2">Status</th>
+                  <th className="py-2 px-2 text-center">Anexos</th>
                   <th className="py-2 px-2 text-right">Valor</th>
                   <th className="py-2 px-2 w-20"></th>
                 </tr>
@@ -564,16 +775,6 @@ function TransacoesPage() {
                             {company.name}
                           </div>
                         )}
-                        {getInvoiceUrl(t) && (
-                          <button
-                            type="button"
-                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); openPreview(getInvoiceUrl(t)!, "Boleto / Fatura"); }}
-                            className="text-xs text-blue-600 dark:text-blue-400 font-medium flex items-center gap-1 mt-1 hover:underline text-left"
-                            title="Visualizar Boleto / Fatura"
-                          >
-                            <FileText className="size-3" /> Boleto/Fatura
-                          </button>
-                        )}
                       </td>
                       <td className="py-3 px-2">
                         <Badge variant={t.type === "entrada" ? "default" : "secondary"}>
@@ -588,21 +789,11 @@ function TransacoesPage() {
                       </td>
                       <td className="py-3 px-2">{formatDate(t.due_date)}</td>
                       <td className="py-3 px-2 text-muted-foreground">
-                        {t.paid_date || getReceiptUrl(t) ? (
+                        {t.paid_date ? (
                           <div className="flex flex-col">
-                            {t.paid_date && <span>{formatDateTime(t.paid_date)}</span>}
+                            <span>{formatDateTime(t.paid_date)}</span>
                             {t.paid_by && profiles?.find((p: any) => p.id === t.paid_by) && (
                               <span className="text-[10px] opacity-80">por {profiles.find((p: any) => p.id === t.paid_by)?.full_name}</span>
-                            )}
-                            {getReceiptUrl(t) && (
-                              <button
-                                type="button"
-                                onClick={(e) => { e.preventDefault(); e.stopPropagation(); openPreview(getReceiptUrl(t)!, "Comprovante de Pagamento"); }}
-                                className="text-xs text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1 mt-0.5 hover:underline text-left"
-                                title="Ver Comprovante de Pagamento"
-                              >
-                                <Paperclip className="size-3" /> Comprovante
-                              </button>
                             )}
                           </div>
                         ) : "-"}
@@ -611,6 +802,69 @@ function TransacoesPage() {
                         <Badge variant={st === "pago" ? "default" : st === "atrasado" ? "destructive" : "secondary"}>
                           {st}
                         </Badge>
+                      </td>
+                      <td className="py-3 px-2 text-center">
+                        <div className="flex items-center justify-center gap-1.5 flex-wrap min-w-[120px]">
+                          {getInvoiceUrl(t) && (
+                            <AttachmentBadge
+                              url={getInvoiceUrl(t)!}
+                              type="invoice"
+                              onOpen={(url, title) => openPreview(url, title)}
+                            />
+                          )}
+                          {getReceiptUrl(t) && (
+                            <AttachmentBadge
+                              url={getReceiptUrl(t)!}
+                              type="receipt"
+                              onOpen={(url, title) => openPreview(url, title)}
+                            />
+                          )}
+                          {!getInvoiceUrl(t) && canWrite && (
+                            <label
+                              htmlFor={`quick-invoice-${t.id}`}
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-normal text-muted-foreground/70 hover:text-primary hover:bg-accent border border-dashed border-border/70 cursor-pointer transition-colors shadow-2xs"
+                              title="Anexar Boleto/Fatura rapidamente antes de pagar"
+                            >
+                              <Plus className="size-3" />
+                              <span>Boleto</span>
+                              <input
+                                id={`quick-invoice-${t.id}`}
+                                type="file"
+                                accept="image/*,application/pdf"
+                                className="sr-only"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) handleQuickAttachInvoice(t.id, file);
+                                  e.target.value = "";
+                                }}
+                              />
+                            </label>
+                          )}
+                          {!getReceiptUrl(t) && t.status === "pago" && canWrite && (
+                            <label
+                              htmlFor={`quick-receipt-${t.id}`}
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-normal text-emerald-600/70 dark:text-emerald-400/70 hover:text-emerald-700 hover:bg-emerald-500/10 border border-dashed border-emerald-500/30 cursor-pointer transition-colors shadow-2xs"
+                              title="Anexar Comprovante de Pagamento"
+                            >
+                              <Plus className="size-3" />
+                              <span>Comprovante</span>
+                              <input
+                                id={`quick-receipt-${t.id}`}
+                                type="file"
+                                accept="image/*,application/pdf"
+                                className="sr-only"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) handleQuickAttachReceipt(t.id, file);
+                                  e.target.value = "";
+                                }}
+                              />
+                            </label>
+                          )}
+                          {!getInvoiceUrl(t) && !getReceiptUrl(t) && !canWrite && (
+                            <span className="text-xs text-muted-foreground/40">-</span>
+                          )}
+                        </div>
                       </td>
                       <td className={`py-3 px-2 text-right tabular font-medium ${t.type === "entrada" ? "text-success" : "text-destructive"}`}>
                         {t.type === "entrada" ? "+" : "-"} {formatBRL(t.amount)}
@@ -653,13 +907,13 @@ function TransacoesPage() {
                 })}
                 {isPending ? (
                   <tr>
-                    <td colSpan={8} className="py-12 text-center text-sm text-muted-foreground animate-pulse">
+                    <td colSpan={9} className="py-12 text-center text-sm text-muted-foreground animate-pulse">
                       Carregando transações...
                     </td>
                   </tr>
                 ) : filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="py-12 text-center text-sm text-muted-foreground">
+                    <td colSpan={9} className="py-12 text-center text-sm text-muted-foreground">
                       Nenhuma transação encontrada.
                     </td>
                   </tr>
