@@ -22,7 +22,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { cn } from "@/lib/utils";
 import { HoverCard, HoverCardTrigger, HoverCardContent } from "@/components/ui/hover-card";
-import { Plus, Search, Trash2, CheckCircle2, Filter, Edit2, Paperclip, ExternalLink, FileText, X, Eye } from "lucide-react";
+import { Plus, Search, Trash2, CheckCircle2, Filter, Edit2, Paperclip, ExternalLink, FileText, X, Eye, Download } from "lucide-react";
 import { toast } from "sonner";
 
 async function uploadTransactionFile(file: File, txId: string, prefix: "invoice" | "receipt" = "receipt"): Promise<string | null> {
@@ -49,11 +49,96 @@ async function uploadTransactionFile(file: File, txId: string, prefix: "invoice"
 
 export const uploadReceiptFile = (file: File, txId: string) => uploadTransactionFile(file, txId, "receipt");
 
+export function openFileInNewTab(url: string) {
+  if (url.startsWith("data:")) {
+    try {
+      const parts = url.split(";base64,");
+      const mime = parts[0].replace("data:", "") || "application/pdf";
+      const byteCharacters = atob(parts[1]);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], { type: mime });
+      const blobUrl = URL.createObjectURL(blob);
+      window.open(blobUrl, "_blank");
+      return;
+    } catch (e) {
+      console.error("Erro ao abrir base64 em nova aba:", e);
+    }
+  }
+  window.open(url, "_blank", "noopener,noreferrer");
+}
+
+export function downloadFile(url: string, filename = "documento") {
+  if (url.startsWith("data:")) {
+    try {
+      const parts = url.split(";base64,");
+      const mime = parts[0].replace("data:", "") || "application/pdf";
+      const ext = mime.includes("pdf") ? ".pdf" : mime.includes("png") ? ".png" : ".jpg";
+      const byteCharacters = atob(parts[1]);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], { type: mime });
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = filename.endsWith(ext) ? filename : `${filename}${ext}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+      return;
+    } catch (e) {
+      console.error("Erro ao baixar base64:", e);
+    }
+  }
+  const a = document.createElement("a");
+  a.href = url;
+  a.target = "_blank";
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
+export function cleanUserNotes(notes?: string | null): string {
+  if (!notes) return "";
+  return notes
+    .split("\n")
+    .filter((line) => {
+      const trimmed = line.trim();
+      return !trimmed.startsWith("[Boleto]:") && !trimmed.startsWith("[Comprovante]:") && !trimmed.startsWith("data:");
+    })
+    .join("\n")
+    .trim();
+}
+
+export function composeNotesWithAttachments(
+  existingNotes?: string | null,
+  attachments?: { invoice?: string | null; receipt?: string | null }
+): string | null {
+  const base = cleanUserNotes(existingNotes);
+  const currentInvoice = attachments?.invoice !== undefined ? attachments.invoice : getInvoiceUrl({ notes: existingNotes });
+  const currentReceipt = attachments?.receipt !== undefined ? attachments.receipt : getReceiptUrl({ notes: existingNotes });
+
+  const parts: string[] = [];
+  if (base) parts.push(base);
+  if (currentInvoice) parts.push(`[Boleto]: ${currentInvoice}`);
+  if (currentReceipt) parts.push(`[Comprovante]: ${currentReceipt}`);
+
+  return parts.length > 0 ? parts.join("\n") : null;
+}
+
 export function getReceiptUrl(t?: { receipt_url?: string | null; notes?: string | null } | null): string | null {
   if (!t) return null;
   if (t.receipt_url) return t.receipt_url;
   if (!t.notes) return null;
-  const match = t.notes.match(/\[Comprovante\]:\s*(https?:\/\/[^\s\n]+)/);
+  const match = t.notes.match(/\[Comprovante\]:\s*(https?:\/\/[^\s\n\r]+|data:[^\s\n\r]+)/i);
   return match ? match[1] : null;
 }
 
@@ -61,8 +146,10 @@ export function getInvoiceUrl(t?: { invoice_url?: string | null; notes?: string 
   if (!t) return null;
   if (t.invoice_url) return t.invoice_url;
   if (!t.notes) return null;
-  const match = t.notes.match(/\[Boleto\]:\s*(https?:\/\/[^\s\n]+)/);
-  return match ? match[1] : null;
+  const match = t.notes.match(/\[Boleto\]:\s*(https?:\/\/[^\s\n\r]+|data:[^\s\n\r]+)/i);
+  if (match) return match[1];
+  const directMatch = t.notes.match(/(data:application\/pdf;base64,[A-Za-z0-9+/=]+|data:image\/[^;\s]+;base64,[A-Za-z0-9+/=]+)/i);
+  return directMatch ? directMatch[1] : null;
 }
 
 function AttachmentBadge({
@@ -144,15 +231,30 @@ function AttachmentBadge({
             >
               <Eye className="size-3" /> Ver em tela cheia
             </button>
-            <a
-              href={url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-muted-foreground hover:text-foreground flex items-center gap-1"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <ExternalLink className="size-3" /> Nova aba
-            </a>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                className="text-muted-foreground hover:text-foreground flex items-center gap-1 hover:underline"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  downloadFile(url, isInvoice ? "boleto" : "comprovante");
+                }}
+                title="Baixar arquivo"
+              >
+                <Download className="size-3" /> Baixar
+              </button>
+              <button
+                type="button"
+                className="text-muted-foreground hover:text-foreground flex items-center gap-1 hover:underline"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  openFileInNewTab(url);
+                }}
+                title="Abrir em nova aba"
+              >
+                <ExternalLink className="size-3" /> Nova aba
+              </button>
+            </div>
           </div>
         </div>
       </HoverCardContent>
@@ -319,8 +421,7 @@ function TransacoesPage() {
       delete payload.receipt_url;
       if (receiptUrl) {
         const { data: currentTx } = await supabase.from("transactions").select("notes").eq("id", markPaidId).single();
-        const existingNotes = currentTx?.notes ? `${currentTx.notes}\n` : "";
-        payload.notes = `${existingNotes}[Comprovante]: ${receiptUrl}`;
+        payload.notes = composeNotesWithAttachments(currentTx?.notes, { receipt: receiptUrl });
       }
       const retry = await supabase.from("transactions").update(payload).eq("id", markPaidId);
       error = retry.error;
@@ -346,8 +447,7 @@ function TransacoesPage() {
       let { error } = await supabase.from("transactions").update(payload).eq("id", txId);
       if (error && (error.message.includes("invoice_url") || error.message.includes("schema cache"))) {
         const { data: currentTx } = await supabase.from("transactions").select("notes").eq("id", txId).single();
-        const existingNotes = currentTx?.notes ? `${currentTx.notes}\n` : "";
-        payload = { notes: `${existingNotes}[Boleto]: ${uploadedUrl}`.trim() };
+        payload = { notes: composeNotesWithAttachments(currentTx?.notes, { invoice: uploadedUrl }) };
         const retry = await supabase.from("transactions").update(payload).eq("id", txId);
         error = retry.error;
       }
@@ -375,8 +475,7 @@ function TransacoesPage() {
       let { error } = await supabase.from("transactions").update(payload).eq("id", txId);
       if (error && (error.message.includes("receipt_url") || error.message.includes("schema cache"))) {
         const { data: currentTx } = await supabase.from("transactions").select("notes").eq("id", txId).single();
-        const existingNotes = currentTx?.notes ? `${currentTx.notes}\n` : "";
-        payload = { notes: `${existingNotes}[Comprovante]: ${uploadedUrl}`.trim() };
+        payload = { notes: composeNotesWithAttachments(currentTx?.notes, { receipt: uploadedUrl }) };
         const retry = await supabase.from("transactions").update(payload).eq("id", txId);
         error = retry.error;
       }
@@ -489,14 +588,22 @@ function TransacoesPage() {
                 {previewFile?.title || "Visualização do Arquivo"}
               </span>
               {previewFile?.url && (
-                <a
-                  href={previewFile.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs text-primary font-normal flex items-center gap-1 hover:underline mr-6"
-                >
-                  <ExternalLink className="size-3.5" /> Abrir em nova aba
-                </a>
+                <div className="flex items-center gap-3 mr-6">
+                  <button
+                    type="button"
+                    onClick={() => downloadFile(previewFile.url, previewFile.title || "documento")}
+                    className="text-xs text-muted-foreground hover:text-foreground font-normal flex items-center gap-1 hover:underline cursor-pointer"
+                  >
+                    <Download className="size-3.5" /> Baixar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => openFileInNewTab(previewFile.url)}
+                    className="text-xs text-primary font-normal flex items-center gap-1 hover:underline cursor-pointer"
+                  >
+                    <ExternalLink className="size-3.5" /> Abrir em nova aba
+                  </button>
+                </div>
               )}
             </DialogTitle>
             <DialogDescription className="sr-only">Visualização do documento anexo</DialogDescription>
@@ -629,6 +736,11 @@ function TransacoesPage() {
                       {t.paid_date && (
                         <p className="text-xs text-muted-foreground mt-0.5">
                           Baixa por: <span className="font-medium text-foreground">{profiles?.find((p: any) => p.id === t.paid_by)?.full_name || "Usuário"}</span> em {formatDateTime(t.paid_date)}
+                        </p>
+                      )}
+                      {cleanUserNotes(t.notes) && (
+                        <p className="text-xs text-muted-foreground/80 italic mt-0.5 line-clamp-1" title={cleanUserNotes(t.notes)}>
+                          Obs: {cleanUserNotes(t.notes)}
                         </p>
                       )}
                       <div className="flex flex-wrap items-center gap-2 mt-2 pt-2 border-t border-dashed border-border/40">
@@ -773,6 +885,11 @@ function TransacoesPage() {
                           <div className="text-xs text-muted-foreground flex items-center gap-1.5">
                             <span className="size-1.5 rounded-full" style={{ background: company.color }} />
                             {company.name}
+                          </div>
+                        )}
+                        {cleanUserNotes(t.notes) && (
+                          <div className="text-[11px] text-muted-foreground/80 italic line-clamp-1 mt-0.5" title={cleanUserNotes(t.notes)}>
+                            Obs: {cleanUserNotes(t.notes)}
                           </div>
                         )}
                       </td>
@@ -968,7 +1085,7 @@ function TransactionDialog({
         status: initialData.status ?? "pendente",
         category_id: initialData.category_id ?? "none",
         cost_center_id: initialData.cost_center_id ?? "none",
-        notes: initialData.notes ?? "",
+        notes: cleanUserNotes(initialData.notes),
         paid_date: initialData.paid_date ?? todayISO(),
         isInstallment: false,
         installments: "2",
@@ -1019,7 +1136,7 @@ function TransactionDialog({
         status: initialData.status ?? "pendente",
         category_id: initialData.category_id ?? "none",
         cost_center_id: initialData.cost_center_id ?? "none",
-        notes: initialData.notes ?? "",
+        notes: cleanUserNotes(initialData.notes),
         paid_date: initialData.paid_date ?? todayISO(),
         isInstallment: false,
         installments: "2",
@@ -1130,6 +1247,11 @@ function TransactionDialog({
         if (uploadedReceipt) finalReceiptUrl = uploadedReceipt;
       }
 
+      const composedNotes = composeNotesWithAttachments(form.notes, {
+        invoice: finalInvoiceUrl,
+        receipt: form.status === "pago" ? finalReceiptUrl : null,
+      });
+
       const payload: any = {
         company_id: form.company_id,
         type: form.type,
@@ -1145,24 +1267,14 @@ function TransactionDialog({
         invoice_url: finalInvoiceUrl,
         category_id: form.category_id !== "none" ? form.category_id : null,
         cost_center_id: form.cost_center_id !== "none" ? form.cost_center_id : null,
-        notes: form.notes || null,
+        notes: composedNotes,
       };
       let { error } = await supabase.from("transactions").update(payload).eq("id", initialData.id);
       
       if (error && (error.message.includes("invoice_url") || error.message.includes("receipt_url") || error.message.includes("schema cache"))) {
-        let notesExtra = "";
-        if (error.message.includes("invoice_url")) {
-          delete payload.invoice_url;
-          if (finalInvoiceUrl) notesExtra += `[Boleto]: ${finalInvoiceUrl}\n`;
-        }
-        if (error.message.includes("receipt_url")) {
-          delete payload.receipt_url;
-          if (finalReceiptUrl) notesExtra += `[Comprovante]: ${finalReceiptUrl}\n`;
-        }
-        if (notesExtra) {
-          const existingNotes = form.notes ? `${form.notes}\n` : "";
-          payload.notes = `${existingNotes}${notesExtra}`.trim();
-        }
+        delete payload.invoice_url;
+        delete payload.receipt_url;
+        payload.notes = composedNotes;
         const retry = await supabase.from("transactions").update(payload).eq("id", initialData.id);
         error = retry.error;
       }
@@ -1184,6 +1296,11 @@ function TransactionDialog({
 
       const payloads: any[] = [];
       for (let i = 0; i < numInstallments; i++) {
+        const composedNotes = composeNotesWithAttachments(form.notes, {
+          invoice: newInvoiceUrl,
+          receipt: i === 0 && form.status === "pago" ? newReceiptUrl : null,
+        });
+
         payloads.push({
           company_id: form.company_id,
           type: form.type,
@@ -1198,7 +1315,7 @@ function TransactionDialog({
           created_by: user?.id,
           category_id: form.category_id !== "none" ? form.category_id : null,
           cost_center_id: form.cost_center_id !== "none" ? form.cost_center_id : null,
-          notes: form.notes || null,
+          notes: composedNotes,
         });
       }
 
@@ -1207,13 +1324,6 @@ function TransactionDialog({
       if (error && (error.message.includes("invoice_url") || error.message.includes("receipt_url") || error.message.includes("schema cache"))) {
         const fallbackPayloads = payloads.map((p) => {
           const cp = { ...p };
-          let notesExtra = "";
-          if (cp.invoice_url) notesExtra += `[Boleto]: ${cp.invoice_url}\n`;
-          if (cp.receipt_url) notesExtra += `[Comprovante]: ${cp.receipt_url}\n`;
-          if (notesExtra) {
-            const existingNotes = cp.notes ? `${cp.notes}\n` : "";
-            cp.notes = `${existingNotes}${notesExtra}`.trim();
-          }
           delete cp.invoice_url;
           delete cp.receipt_url;
           return cp;
