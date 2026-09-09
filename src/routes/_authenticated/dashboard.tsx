@@ -5,6 +5,8 @@ import { useAuth, applyCompanyFilter } from "@/lib/auth";
 import { formatBRL, statusLabel, formatDate, getDaysOverdue, todayISO } from "@/lib/format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Link } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
@@ -18,6 +20,8 @@ import {
   CheckCircle2,
   AlertTriangle,
   Plus,
+  Filter,
+  X,
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -103,7 +107,23 @@ function DashboardPage() {
   const recent = txs.slice(0, 6);
   
   const today = todayISO();
-  const pendingTxs = txs.filter((t) => t.status === "pendente");
+  const [dueDateFrom, setDueDateFrom] = useState("");
+  const [dueDateTo, setDueDateTo] = useState("");
+
+  const firstDayOfMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
+
+  const addDaysISO = (dateStr: string, days: number): string => {
+    const d = new Date(dateStr + "T12:00:00");
+    d.setDate(d.getDate() + days);
+    return d.toISOString().split("T")[0];
+  };
+
+  const pendingTxs = txs.filter((t) => {
+    if (t.status !== "pendente") return false;
+    if (dueDateFrom && t.due_date < dueDateFrom) return false;
+    if (dueDateTo && t.due_date > dueDateTo) return false;
+    return true;
+  });
 
   const vencidos = pendingTxs
     .filter((t) => t.due_date < today)
@@ -273,9 +293,16 @@ function DashboardPage() {
 
           <Card className="order-1 lg:order-none flex flex-col h-full">
             <Tabs defaultValue={vencidos.length > 0 ? "vencidos" : aVencerHoje.length > 0 ? "hoje" : "a_vencer"} className="flex flex-col h-full">
-              <CardHeader className="pb-3">
+              <CardHeader className="pb-3 space-y-2.5">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <CardTitle className="text-base font-semibold whitespace-nowrap shrink-0">Próximos vencimentos</CardTitle>
+                  <div className="flex items-center gap-2">
+                    <CardTitle className="text-base font-semibold whitespace-nowrap shrink-0">Próximos vencimentos</CardTitle>
+                    {(dueDateFrom || dueDateTo) && (
+                      <Badge variant="secondary" className="text-[10px] font-medium px-1.5 py-0.5 text-primary bg-primary/10 border-primary/20">
+                        Filtrado
+                      </Badge>
+                    )}
+                  </div>
                   <TabsList className="h-auto p-1 w-full sm:w-auto overflow-x-auto justify-start sm:justify-end shrink-0 flex gap-1 bg-muted/60">
                     <TabsTrigger value="vencidos" className="text-xs px-2.5 py-1.5 h-auto flex flex-col items-start gap-0.5 shrink-0 data-[state=active]:bg-background data-[state=active]:shadow-2xs">
                       <span className="text-[11px] text-muted-foreground font-medium">Vencidos ({vencidos.length})</span>
@@ -291,12 +318,111 @@ function DashboardPage() {
                     </TabsTrigger>
                   </TabsList>
                 </div>
+
+                {/* Filtro de datas */}
+                <div className="pt-2 border-t flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-1 overflow-x-auto py-0.5">
+                    <span className="text-[11px] text-muted-foreground font-medium mr-1 flex items-center gap-1 shrink-0">
+                      <Filter className="size-3 text-muted-foreground" />
+                      Filtro:
+                    </span>
+                    <Button
+                      type="button"
+                      variant={!dueDateFrom && !dueDateTo ? "secondary" : "ghost"}
+                      size="sm"
+                      className="h-7 text-xs px-2"
+                      onClick={() => {
+                        setDueDateFrom("");
+                        setDueDateTo("");
+                      }}
+                    >
+                      Todos
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={dueDateFrom === today && dueDateTo === addDaysISO(today, 7) ? "secondary" : "ghost"}
+                      size="sm"
+                      className="h-7 text-xs px-2"
+                      onClick={() => {
+                        setDueDateFrom(today);
+                        setDueDateTo(addDaysISO(today, 7));
+                      }}
+                    >
+                      +7d
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={dueDateFrom === today && dueDateTo === addDaysISO(today, 15) ? "secondary" : "ghost"}
+                      size="sm"
+                      className="h-7 text-xs px-2"
+                      onClick={() => {
+                        setDueDateFrom(today);
+                        setDueDateTo(addDaysISO(today, 15));
+                      }}
+                    >
+                      +15d
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={dueDateFrom === today && dueDateTo === addDaysISO(today, 30) ? "secondary" : "ghost"}
+                      size="sm"
+                      className="h-7 text-xs px-2"
+                      onClick={() => {
+                        setDueDateFrom(today);
+                        setDueDateTo(addDaysISO(today, 30));
+                      }}
+                    >
+                      +30d
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={dueDateFrom === firstDayOfMonth && dueDateTo === lastDayOfMonth ? "secondary" : "ghost"}
+                      size="sm"
+                      className="h-7 text-xs px-2"
+                      onClick={() => {
+                        setDueDateFrom(firstDayOfMonth);
+                        setDueDateTo(lastDayOfMonth);
+                      }}
+                    >
+                      Este mês
+                    </Button>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 flex-wrap sm:flex-nowrap">
+                    <div className="flex items-center gap-1">
+                      <span className="text-[11px] text-muted-foreground">De</span>
+                      <DatePicker className="h-7 text-xs w-[125px] px-2" value={dueDateFrom} onChange={setDueDateFrom} />
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span className="text-[11px] text-muted-foreground">Até</span>
+                      <DatePicker className="h-7 text-xs w-[125px] px-2" value={dueDateTo} onChange={setDueDateTo} />
+                    </div>
+                    {(dueDateFrom || dueDateTo) && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 px-1.5 text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
+                        onClick={() => {
+                          setDueDateFrom("");
+                          setDueDateTo("");
+                        }}
+                        title="Limpar filtro de data"
+                      >
+                        <X className="size-3.5" />
+                        <span className="hidden sm:inline">Limpar</span>
+                      </Button>
+                    )}
+                  </div>
+                </div>
               </CardHeader>
 
               <CardContent className="pt-2 flex-1 overflow-y-auto min-h-[480px] sm:min-h-[360px] max-h-[580px] sm:max-h-[480px] pr-1">
                 <TabsContent value="vencidos" className="mt-0 space-y-2">
                   {vencidos.length === 0 ? (
-                    <p className="text-sm text-muted-foreground py-8 text-center">Nenhum título vencido.</p>
+                    <p className="text-sm text-muted-foreground py-8 text-center">
+                      {dueDateFrom || dueDateTo ? "Nenhum título vencido no período selecionado." : "Nenhum título vencido."}
+                    </p>
                   ) : (
                     <>
                       <div className="flex items-center justify-between px-3 py-2 bg-destructive/10 border border-destructive/20 rounded-lg text-xs font-medium text-destructive mb-3">
@@ -335,7 +461,9 @@ function DashboardPage() {
 
                 <TabsContent value="hoje" className="mt-0 space-y-2">
                   {aVencerHoje.length === 0 ? (
-                    <p className="text-sm text-muted-foreground py-8 text-center">Nenhum título a vencer hoje.</p>
+                    <p className="text-sm text-muted-foreground py-8 text-center">
+                      {dueDateFrom || dueDateTo ? "Nenhum título a vencer hoje no período selecionado." : "Nenhum título a vencer hoje."}
+                    </p>
                   ) : (
                     <>
                       <div className="flex items-center justify-between px-3 py-2 bg-amber-500/10 border border-amber-500/20 rounded-lg text-xs font-medium text-amber-700 mb-3">
@@ -373,7 +501,9 @@ function DashboardPage() {
 
                 <TabsContent value="a_vencer" className="mt-0 space-y-2">
                   {aVencerFuturo.length === 0 ? (
-                    <p className="text-sm text-muted-foreground py-8 text-center">Nenhum título a vencer nos próximos dias.</p>
+                    <p className="text-sm text-muted-foreground py-8 text-center">
+                      {dueDateFrom || dueDateTo ? "Nenhum título a vencer no período selecionado." : "Nenhum título a vencer nos próximos dias."}
+                    </p>
                   ) : (
                     <>
                       <div className="flex items-center justify-between px-3 py-2 bg-muted/60 border rounded-lg text-xs font-medium text-foreground mb-3">
