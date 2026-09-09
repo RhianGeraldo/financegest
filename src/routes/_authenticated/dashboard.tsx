@@ -117,6 +117,10 @@ function DashboardPage() {
     .filter((t) => t.due_date > today)
     .sort((a, b) => a.due_date.localeCompare(b.due_date));
 
+  const totalVencidos = vencidos.reduce((s, t) => s + Number(t.amount || 0), 0);
+  const totalHoje = aVencerHoje.reduce((s, t) => s + Number(t.amount || 0), 0);
+  const totalFuturo = aVencerFuturo.reduce((s, t) => s + Number(t.amount || 0), 0);
+
   const stats = [
     { label: "Saldo total", value: formatBRL(saldoTotal), icon: Wallet, accent: "text-primary" },
     { label: "Entradas do mês", value: formatBRL(inMonth), icon: ArrowDownRight, accent: "text-success" },
@@ -272,15 +276,18 @@ function DashboardPage() {
               <CardHeader className="pb-3">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <CardTitle className="text-base font-semibold whitespace-nowrap shrink-0">Próximos vencimentos</CardTitle>
-                  <TabsList className="h-8 p-1 w-full sm:w-auto overflow-x-auto justify-start sm:justify-center shrink-0">
-                    <TabsTrigger value="vencidos" className="text-xs px-2.5 h-6 shrink-0">
-                      Vencidos ({vencidos.length})
+                  <TabsList className="h-auto p-1 w-full sm:w-auto overflow-x-auto justify-start sm:justify-end shrink-0 flex gap-1 bg-muted/60">
+                    <TabsTrigger value="vencidos" className="text-xs px-2.5 py-1.5 h-auto flex flex-col items-start gap-0.5 shrink-0 data-[state=active]:bg-background data-[state=active]:shadow-2xs">
+                      <span className="text-[11px] text-muted-foreground font-medium">Vencidos ({vencidos.length})</span>
+                      <span className="font-semibold tabular text-xs text-destructive">{formatBRL(totalVencidos)}</span>
                     </TabsTrigger>
-                    <TabsTrigger value="hoje" className="text-xs px-2.5 h-6 shrink-0">
-                      A vencer hoje ({aVencerHoje.length})
+                    <TabsTrigger value="hoje" className="text-xs px-2.5 py-1.5 h-auto flex flex-col items-start gap-0.5 shrink-0 data-[state=active]:bg-background data-[state=active]:shadow-2xs">
+                      <span className="text-[11px] text-muted-foreground font-medium">Hoje ({aVencerHoje.length})</span>
+                      <span className="font-semibold tabular text-xs text-amber-600">{formatBRL(totalHoje)}</span>
                     </TabsTrigger>
-                    <TabsTrigger value="a_vencer" className="text-xs px-2.5 h-6 shrink-0">
-                      A vencer ({aVencerFuturo.length})
+                    <TabsTrigger value="a_vencer" className="text-xs px-2.5 py-1.5 h-auto flex flex-col items-start gap-0.5 shrink-0 data-[state=active]:bg-background data-[state=active]:shadow-2xs">
+                      <span className="text-[11px] text-muted-foreground font-medium">A vencer ({aVencerFuturo.length})</span>
+                      <span className="font-semibold tabular text-xs text-foreground/90">{formatBRL(totalFuturo)}</span>
                     </TabsTrigger>
                   </TabsList>
                 </div>
@@ -291,32 +298,38 @@ function DashboardPage() {
                   {vencidos.length === 0 ? (
                     <p className="text-sm text-muted-foreground py-8 text-center">Nenhum título vencido.</p>
                   ) : (
-                    vencidos.map((t) => {
-                      const daysOverdue = getDaysOverdue(t.due_date);
-                      const company = companies.find((c) => c.id === t.company_id);
-                      return (
-                        <Link key={t.id} to="/transacoes" search={{ editId: t.id }} className="flex items-center justify-between py-2 border-b last:border-0 hover:bg-accent/20 px-1 rounded transition-colors cursor-pointer">
-                          <div className="min-w-0 pr-2">
-                            <p className="text-sm font-medium truncate">{t.description}</p>
-                            {company && (
-                              <p className="text-xs text-muted-foreground flex items-center gap-1.5 mt-0.5">
-                                <span className="size-1.5 rounded-full shrink-0" style={{ background: company.color }} />
-                                <span className="truncate">{company.name}</span>
+                    <>
+                      <div className="flex items-center justify-between px-3 py-2 bg-destructive/10 border border-destructive/20 rounded-lg text-xs font-medium text-destructive mb-3">
+                        <span>Total Vencido ({vencidos.length} {vencidos.length === 1 ? "título" : "títulos"}):</span>
+                        <span className="text-sm font-bold tabular">{formatBRL(totalVencidos)}</span>
+                      </div>
+                      {vencidos.map((t) => {
+                        const daysOverdue = getDaysOverdue(t.due_date);
+                        const company = companies.find((c) => c.id === t.company_id);
+                        return (
+                          <Link key={t.id} to="/transacoes" search={{ editId: t.id }} className="flex items-center justify-between py-2 border-b last:border-0 hover:bg-accent/20 px-1 rounded transition-colors cursor-pointer">
+                            <div className="min-w-0 pr-2">
+                              <p className="text-sm font-medium truncate">{t.description}</p>
+                              {company && (
+                                <p className="text-xs text-muted-foreground flex items-center gap-1.5 mt-0.5">
+                                  <span className="size-1.5 rounded-full shrink-0" style={{ background: company.color }} />
+                                  <span className="truncate">{company.name}</span>
+                                </p>
+                              )}
+                              <p className="text-xs text-destructive font-medium mt-0.5">
+                                Venceu {formatDate(t.due_date)} • {daysOverdue} {daysOverdue === 1 ? "dia" : "dias"} em atraso
                               </p>
-                            )}
-                            <p className="text-xs text-destructive font-medium mt-0.5">
-                              Venceu {formatDate(t.due_date)} • {daysOverdue} {daysOverdue === 1 ? "dia" : "dias"} em atraso
-                            </p>
-                          </div>
-                          <div className="text-right shrink-0">
-                            <p className="text-sm font-medium tabular">{formatBRL(t.amount)}</p>
-                            <Badge variant="destructive" className="text-[10px] mt-0.5">
-                              atrasado
-                            </Badge>
-                          </div>
-                        </Link>
-                      );
-                    })
+                            </div>
+                            <div className="text-right shrink-0">
+                              <p className="text-sm font-medium tabular">{formatBRL(t.amount)}</p>
+                              <Badge variant="destructive" className="text-[10px] mt-0.5">
+                                atrasado
+                              </Badge>
+                            </div>
+                          </Link>
+                        );
+                      })}
+                    </>
                   )}
                 </TabsContent>
 
@@ -324,31 +337,37 @@ function DashboardPage() {
                   {aVencerHoje.length === 0 ? (
                     <p className="text-sm text-muted-foreground py-8 text-center">Nenhum título a vencer hoje.</p>
                   ) : (
-                    aVencerHoje.map((t) => {
-                      const company = companies.find((c) => c.id === t.company_id);
-                      return (
-                        <Link key={t.id} to="/transacoes" search={{ editId: t.id }} className="flex items-center justify-between py-2 border-b last:border-0 hover:bg-accent/20 px-1 rounded transition-colors cursor-pointer">
-                          <div className="min-w-0 pr-2">
-                            <p className="text-sm font-medium truncate">{t.description}</p>
-                            {company && (
-                              <p className="text-xs text-muted-foreground flex items-center gap-1.5 mt-0.5">
-                                <span className="size-1.5 rounded-full shrink-0" style={{ background: company.color }} />
-                                <span className="truncate">{company.name}</span>
+                    <>
+                      <div className="flex items-center justify-between px-3 py-2 bg-amber-500/10 border border-amber-500/20 rounded-lg text-xs font-medium text-amber-700 mb-3">
+                        <span>Total a Vencer Hoje ({aVencerHoje.length} {aVencerHoje.length === 1 ? "título" : "títulos"}):</span>
+                        <span className="text-sm font-bold tabular">{formatBRL(totalHoje)}</span>
+                      </div>
+                      {aVencerHoje.map((t) => {
+                        const company = companies.find((c) => c.id === t.company_id);
+                        return (
+                          <Link key={t.id} to="/transacoes" search={{ editId: t.id }} className="flex items-center justify-between py-2 border-b last:border-0 hover:bg-accent/20 px-1 rounded transition-colors cursor-pointer">
+                            <div className="min-w-0 pr-2">
+                              <p className="text-sm font-medium truncate">{t.description}</p>
+                              {company && (
+                                <p className="text-xs text-muted-foreground flex items-center gap-1.5 mt-0.5">
+                                  <span className="size-1.5 rounded-full shrink-0" style={{ background: company.color }} />
+                                  <span className="truncate">{company.name}</span>
+                                </p>
+                              )}
+                              <p className="text-xs text-amber-600 font-medium mt-0.5">
+                                Vence hoje ({formatDate(t.due_date)})
                               </p>
-                            )}
-                            <p className="text-xs text-amber-600 dark:text-amber-400 font-medium mt-0.5">
-                              Vence hoje ({formatDate(t.due_date)})
-                            </p>
-                          </div>
-                          <div className="text-right shrink-0">
-                            <p className="text-sm font-medium tabular">{formatBRL(t.amount)}</p>
-                            <Badge variant="secondary" className="text-[10px] bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/20 mt-0.5">
-                              hoje
-                            </Badge>
-                          </div>
-                        </Link>
-                      );
-                    })
+                            </div>
+                            <div className="text-right shrink-0">
+                              <p className="text-sm font-medium tabular">{formatBRL(t.amount)}</p>
+                              <Badge variant="secondary" className="text-[10px] bg-amber-500/15 text-amber-600 border-amber-500/20 mt-0.5">
+                                hoje
+                              </Badge>
+                            </div>
+                          </Link>
+                        );
+                      })}
+                    </>
                   )}
                 </TabsContent>
 
@@ -356,31 +375,37 @@ function DashboardPage() {
                   {aVencerFuturo.length === 0 ? (
                     <p className="text-sm text-muted-foreground py-8 text-center">Nenhum título a vencer nos próximos dias.</p>
                   ) : (
-                    aVencerFuturo.map((t) => {
-                      const company = companies.find((c) => c.id === t.company_id);
-                      return (
-                        <Link key={t.id} to="/transacoes" search={{ editId: t.id }} className="flex items-center justify-between py-2 border-b last:border-0 hover:bg-accent/20 px-1 rounded transition-colors cursor-pointer">
-                          <div className="min-w-0 pr-2">
-                            <p className="text-sm font-medium truncate">{t.description}</p>
-                            {company && (
-                              <p className="text-xs text-muted-foreground flex items-center gap-1.5 mt-0.5">
-                                <span className="size-1.5 rounded-full shrink-0" style={{ background: company.color }} />
-                                <span className="truncate">{company.name}</span>
+                    <>
+                      <div className="flex items-center justify-between px-3 py-2 bg-muted/60 border rounded-lg text-xs font-medium text-foreground mb-3">
+                        <span className="text-muted-foreground">Total a Vencer ({aVencerFuturo.length} {aVencerFuturo.length === 1 ? "título" : "títulos"}):</span>
+                        <span className="text-sm font-bold tabular">{formatBRL(totalFuturo)}</span>
+                      </div>
+                      {aVencerFuturo.map((t) => {
+                        const company = companies.find((c) => c.id === t.company_id);
+                        return (
+                          <Link key={t.id} to="/transacoes" search={{ editId: t.id }} className="flex items-center justify-between py-2 border-b last:border-0 hover:bg-accent/20 px-1 rounded transition-colors cursor-pointer">
+                            <div className="min-w-0 pr-2">
+                              <p className="text-sm font-medium truncate">{t.description}</p>
+                              {company && (
+                                <p className="text-xs text-muted-foreground flex items-center gap-1.5 mt-0.5">
+                                  <span className="size-1.5 rounded-full shrink-0" style={{ background: company.color }} />
+                                  <span className="truncate">{company.name}</span>
+                                </p>
+                              )}
+                              <p className="text-xs text-muted-foreground mt-0.5">
+                                Vence {formatDate(t.due_date)}
                               </p>
-                            )}
-                            <p className="text-xs text-muted-foreground mt-0.5">
-                              Vence {formatDate(t.due_date)}
-                            </p>
-                          </div>
-                          <div className="text-right shrink-0">
-                            <p className="text-sm font-medium tabular">{formatBRL(t.amount)}</p>
-                            <Badge variant="secondary" className="text-[10px] mt-0.5">
-                              pendente
-                            </Badge>
-                          </div>
-                        </Link>
-                      );
-                    })
+                            </div>
+                            <div className="text-right shrink-0">
+                              <p className="text-sm font-medium tabular">{formatBRL(t.amount)}</p>
+                              <Badge variant="secondary" className="text-[10px] mt-0.5">
+                                pendente
+                              </Badge>
+                            </div>
+                          </Link>
+                        );
+                      })}
+                    </>
                   )}
                 </TabsContent>
               </CardContent>
