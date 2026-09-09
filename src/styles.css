@@ -2,8 +2,6 @@
 @source "../src";
 @import "tw-animate-css";
 
-@custom-variant dark (&:is(.dark *));
-
 /*
  * Caixa — Sistema Financeiro
  * Design system inspirado em Ramp / Linear / Stripe.
@@ -102,48 +100,6 @@
   --sidebar-accent-foreground: oklch(0.22 0.03 265);
   --sidebar-border: oklch(0.92 0.006 250);
   --sidebar-ring: oklch(0.55 0.18 265);
-}
-
-.dark {
-  /* Dark — fundo quase preto azulado, premium */
-  --background: oklch(0.14 0.012 250);
-  --foreground: oklch(0.96 0.005 250);
-  --card: oklch(0.18 0.014 250);
-  --card-foreground: oklch(0.96 0.005 250);
-  --popover: oklch(0.18 0.014 250);
-  --popover-foreground: oklch(0.96 0.005 250);
-  --primary: oklch(0.72 0.17 265);
-  --primary-foreground: oklch(0.14 0.012 250);
-  --secondary: oklch(0.22 0.014 250);
-  --secondary-foreground: oklch(0.96 0.005 250);
-  --muted: oklch(0.22 0.014 250);
-  --muted-foreground: oklch(0.68 0.015 250);
-  --accent: oklch(0.26 0.04 265);
-  --accent-foreground: oklch(0.96 0.005 250);
-  --destructive: oklch(0.65 0.22 25);
-  --destructive-foreground: oklch(0.99 0 0);
-  --success: oklch(0.72 0.17 155);
-  --success-foreground: oklch(0.14 0.012 250);
-  --warning: oklch(0.78 0.17 75);
-  --warning-foreground: oklch(0.14 0.012 250);
-  --border: oklch(0.26 0.012 250);
-  --input: oklch(0.24 0.012 250);
-  --ring: oklch(0.72 0.17 265);
-
-  --chart-1: oklch(0.72 0.17 265);
-  --chart-2: oklch(0.72 0.17 155);
-  --chart-3: oklch(0.78 0.17 75);
-  --chart-4: oklch(0.7 0.2 25);
-  --chart-5: oklch(0.7 0.18 310);
-
-  --sidebar: oklch(0.16 0.012 250);
-  --sidebar-foreground: oklch(0.88 0.01 250);
-  --sidebar-primary: oklch(0.72 0.17 265);
-  --sidebar-primary-foreground: oklch(0.14 0.012 250);
-  --sidebar-accent: oklch(0.22 0.018 250);
-  --sidebar-accent-foreground: oklch(0.96 0.005 250);
-  --sidebar-border: oklch(0.22 0.014 250);
-  --sidebar-ring: oklch(0.72 0.17 265);
 }
 
 @layer base {

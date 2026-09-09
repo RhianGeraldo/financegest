@@ -3,7 +3,6 @@ import { useEffect } from "react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { MobileNav } from "@/components/mobile-nav";
-import { ThemeToggle } from "@/components/theme-toggle";
 import { useAuth } from "@/lib/auth";
 
 export const Route = createFileRoute("/_authenticated")({
@@ -38,7 +37,6 @@ function AuthLayout() {
               </div>
               <div id="page-header" className="flex-1 flex items-center justify-between min-w-0" />
             </div>
-            <ThemeToggle />
           </header>
           <main className="flex-1 p-6 pb-24 md:pb-6">
             <Outlet />
