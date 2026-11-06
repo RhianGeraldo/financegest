@@ -30,10 +30,61 @@ export interface ResolvedScope {
   keyRecord?: ApiKeyRecord;
 }
 
-const DATA_FILE = path.resolve(import.meta.dirname, "../../data/api-keys.json");
+const BUCKET_NAME = "mcp_system";
+const FILE_NAME = "api-keys.json";
 
-async function readLocalKeys(): Promise<ApiKeyRecord[]> {
+async function readStoredKeys(): Promise<ApiKeyRecord[]> {
+  const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
+  const serviceKey =
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.SUPABASE_SERVICE_ROLE ||
+    process.env.SUPABASE_SERVICE_KEY ||
+    process.env.VITE_SUPABASE_ANON_KEY ||
+    "";
+
+  // 1. Tenta banco de dados
   try {
+    const { data: dbKeys, error } = await supabase
+      .from("mcp_api_keys")
+      .select("*")
+      .order("created_at", { ascending: false });
+    if (!error && dbKeys && dbKeys.length > 0) {
+      return dbKeys.map((k) => ({
+        id: k.id,
+        user_id: k.user_id,
+        user_name: "Usuário",
+        name: k.name,
+        key: k.key_hash,
+        allowed_company_ids: k.allowed_company_ids || [],
+        allowed_bank_account_ids: k.allowed_bank_account_ids || [],
+        auto_include_new_accounts: k.auto_include_new_accounts !== false,
+        active: k.active,
+        created_at: k.created_at,
+        last_used_at: k.last_used_at,
+      }));
+    }
+  } catch {}
+
+  // 2. Tenta Supabase Storage
+  try {
+    if (url && serviceKey) {
+      const res = await fetch(
+        `${url}/storage/v1/object/authenticated/${BUCKET_NAME}/${FILE_NAME}?t=${Date.now()}`,
+        {
+          headers: { Authorization: `Bearer ${serviceKey}` },
+          cache: "no-store",
+        }
+      );
+      if (res.ok) {
+        const keys = await res.json();
+        if (Array.isArray(keys)) return keys;
+      }
+    }
+  } catch {}
+
+  // 3. Fallback local (dev)
+  try {
+    const DATA_FILE = path.resolve(process.cwd(), "mcp-server/data/api-keys.json");
     const raw = await fs.readFile(DATA_FILE, "utf-8");
     return JSON.parse(raw);
   } catch {
@@ -41,9 +92,27 @@ async function readLocalKeys(): Promise<ApiKeyRecord[]> {
   }
 }
 
-async function saveLocalKeys(keys: ApiKeyRecord[]): Promise<void> {
-  await fs.mkdir(path.dirname(DATA_FILE), { recursive: true });
-  await fs.writeFile(DATA_FILE, JSON.stringify(keys, null, 2), "utf-8");
+async function writeStoredKeys(keys: ApiKeyRecord[]): Promise<boolean> {
+  let saved = false;
+
+  // 1. Tenta Supabase Storage
+  try {
+    const { error } = await supabase.storage.from(BUCKET_NAME).upload(
+      FILE_NAME,
+      Buffer.from(JSON.stringify(keys, null, 2)),
+      { contentType: "application/json", upsert: true, cacheControl: "0" }
+    );
+    if (!error) saved = true;
+  } catch {}
+
+  // 2. Tenta arquivo local (se permitido)
+  try {
+    const DATA_FILE = path.resolve(process.cwd(), "mcp-server/data/api-keys.json");
+    await fs.mkdir(path.dirname(DATA_FILE), { recursive: true });
+    await fs.writeFile(DATA_FILE, JSON.stringify(keys, null, 2), "utf-8");
+  } catch {}
+
+  return saved;
 }
 
 export async function getUserAvailableScope(userQuery: string) {
@@ -184,16 +253,16 @@ export async function createApiKey(params: {
       allowed_bank_account_ids: keyRecord.allowed_bank_account_ids,
       active: true,
     });
-    if (error) {
-      const local = await readLocalKeys();
-      local.push(keyRecord);
-      await saveLocalKeys(local);
-    }
-  } catch {
-    const local = await readLocalKeys();
-    local.push(keyRecord);
-    await saveLocalKeys(local);
+  } catch {}
+
+  const keys = await readStoredKeys();
+  const existingIndex = keys.findIndex((k) => k.id === keyRecord.id);
+  if (existingIndex >= 0) {
+    keys[existingIndex] = keyRecord;
+  } else {
+    keys.unshift(keyRecord);
   }
+  await writeStoredKeys(keys);
 
   const companyNames = userScope.companies
     .filter((c) => selectedCompanyIds.has(c.id))
@@ -255,8 +324,8 @@ export async function validateApiKey(apiKeyInput?: string): Promise<ResolvedScop
   } catch {}
 
   if (!record) {
-    const local = await readLocalKeys();
-    record = local.find((k) => k.key === token && k.active);
+    const stored = await readStoredKeys();
+    record = stored.find((k) => (k.key === token || (k as any).key_hash === token) && k.active !== false);
   }
 
   if (!record) {
@@ -321,9 +390,9 @@ export async function listApiKeys(userId?: string): Promise<ApiKeyRecord[]> {
     }
   } catch {}
 
-  const local = await readLocalKeys();
-  if (userId) return local.filter((k) => k.user_id === userId);
-  return local;
+  const stored = await readStoredKeys();
+  if (userId) return stored.filter((k) => k.user_id === userId);
+  return stored;
 }
 
 export async function revokeApiKey(keyId: string): Promise<boolean> {
@@ -333,11 +402,11 @@ export async function revokeApiKey(keyId: string): Promise<boolean> {
     if (!error) updatedInDb = true;
   } catch {}
 
-  const local = await readLocalKeys();
-  const item = local.find((k) => k.id === keyId || k.key === keyId);
+  const stored = await readStoredKeys();
+  const item = stored.find((k) => k.id === keyId || k.key === keyId);
   if (item) {
     item.active = false;
-    await saveLocalKeys(local);
+    await writeStoredKeys(stored);
     return true;
   }
 
