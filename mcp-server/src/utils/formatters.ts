@@ -19,6 +19,35 @@ export function todayISO(): string {
   return new Date().toISOString().split("T")[0];
 }
 
+export function parseFlexibleDate(val?: string | null): string {
+  if (!val) return todayISO();
+  const lower = val.toLowerCase().trim();
+  if (lower === "hoje" || lower === "today") return todayISO();
+  if (lower === "ontem" || lower === "yesterday") {
+    const d = new Date();
+    d.setDate(d.getDate() - 1);
+    return d.toISOString().split("T")[0];
+  }
+  if (lower === "amanha" || lower === "amanhã" || lower === "tomorrow") {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    return d.toISOString().split("T")[0];
+  }
+
+  // DD/MM/YYYY
+  if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(lower)) {
+    const [day, month, year] = lower.split("/");
+    return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+  }
+
+  // YYYY-MM-DD
+  if (lower.length >= 10 && /^\d{4}-\d{2}-\d{2}/.test(lower)) {
+    return lower.slice(0, 10);
+  }
+
+  return val;
+}
+
 export function addMonths(dateStr: string, months: number): string {
   const parts = dateStr.split("-");
   const year = parseInt(parts[0], 10);

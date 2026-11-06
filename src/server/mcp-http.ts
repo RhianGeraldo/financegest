@@ -13,6 +13,7 @@ import {
   updateTransaction,
   deleteTransaction,
   listTransactions,
+  createBankAccount,
 } from "../../mcp-server/src/services/transactions.service.js";
 import {
   getAccountsBalanceReport,
@@ -46,6 +47,20 @@ const TOOLS_DEFINITIONS = [
       properties: {
         empresa: { type: "string", description: "Nome ou ID da empresa para filtrar (opcional)" },
       },
+    },
+  },
+  {
+    name: "cadastrar_conta_bancaria",
+    description: "Cadastra uma nova conta bancária para uma empresa autorizada (ex: adicionar um banco a uma unidade/empresa).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        empresa: { type: "string", description: "Nome ou ID da empresa (ex: 'Aracruz', 'Linhares', 'Serra')" },
+        banco: { type: "string", description: "Nome da instituição bancária (ex: 'Caixa Econômica', 'Banco do Brasil', 'Itaú', 'Sicoob')" },
+        nome: { type: "string", description: "Nome de identificação da conta (ex: 'Conta Corrente Principal', 'Caixa Aracruz')" },
+        saldo_inicial: { type: "number", description: "Saldo inicial da conta (opcional, padrão 0)" },
+      },
+      required: ["empresa", "banco", "nome"],
     },
   },
   {
@@ -275,6 +290,17 @@ async function executeTool(name: string, args: any, scope: ResolvedScope) {
 
     case "listar_contas_bancarias":
       return await getAccountsBalanceReport(args?.empresa, scope);
+
+    case "cadastrar_conta_bancaria":
+      return await createBankAccount(
+        {
+          companyQuery: args.empresa,
+          bank: args.banco,
+          name: args.nome,
+          initialBalance: args.saldo_inicial,
+        },
+        scope
+      );
 
     case "resolver_conta_e_empresa": {
       const resolved = await resolveAccountAndCompany(

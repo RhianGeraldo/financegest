@@ -19,7 +19,6 @@ export async function getFinancialSummary(
 
   if (scope && !scope.isMaster) {
     if (scope.allowedCompanyIds) q = q.in("company_id", Array.from(scope.allowedCompanyIds));
-    if (scope.allowedBankAccountIds) q = q.in("bank_account_id", Array.from(scope.allowedBankAccountIds));
   }
 
   let companyName = scope && !scope.isMaster ? `Visão Autorizada (${scope.user?.name})` : "Consolidado Geral";

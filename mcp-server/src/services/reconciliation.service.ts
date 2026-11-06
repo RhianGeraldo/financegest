@@ -242,7 +242,6 @@ export async function getPendingWithoutReceipt(companyQuery?: string, scope?: Re
 
   if (scope && !scope.isMaster) {
     if (scope.allowedCompanyIds) q = q.in("company_id", Array.from(scope.allowedCompanyIds));
-    if (scope.allowedBankAccountIds) q = q.in("bank_account_id", Array.from(scope.allowedBankAccountIds));
   }
 
   if (companyQuery) {
@@ -287,7 +286,6 @@ export async function getOverdueTransactions(companyQuery?: string, scope?: Reso
 
   if (scope && !scope.isMaster) {
     if (scope.allowedCompanyIds) q = q.in("company_id", Array.from(scope.allowedCompanyIds));
-    if (scope.allowedBankAccountIds) q = q.in("bank_account_id", Array.from(scope.allowedBankAccountIds));
   }
 
   if (companyQuery) {

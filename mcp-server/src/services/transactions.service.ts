@@ -2,6 +2,7 @@ import { supabase } from "../config.js";
 import { resolveAccountAndCompany } from "../utils/account-matcher.js";
 import {
   todayISO,
+  parseFlexibleDate,
   addMonths,
   composeNotesWithAttachments,
   normalizeText,
@@ -122,7 +123,19 @@ export async function createTransaction(params: CreateTransactionParams, scope?:
     throw new Error("O valor da transação deve ser positivo e maior que zero.");
   }
 
-  // 1. Resolver rigorosamente Empresa e Conta Bancária dentro do escopo da API Key
+  // 1. Normalizar tipo ("despesa" -> "saida", "receita" -> "entrada")
+  let effectiveType: "entrada" | "saida" = "saida";
+  const rawType = (type || "").toLowerCase().trim();
+  if (rawType === "entrada" || rawType === "receita" || rawType === "income") {
+    effectiveType = "entrada";
+  } else {
+    effectiveType = "saida";
+  }
+
+  // 2. Normalizar data de vencimento (aceita "hoje", "ontem", DD/MM/YYYY, etc)
+  const normalizedDueDate = parseFlexibleDate(dueDate);
+
+  // 3. Resolver rigorosamente Empresa e Conta Bancária dentro do escopo da API Key
   const resolved = await resolveAccountAndCompany(
     {
       accountQuery,
@@ -134,15 +147,16 @@ export async function createTransaction(params: CreateTransactionParams, scope?:
 
   const companyId = resolved.company.id;
   const bankAccountId = resolved.bankAccount?.id || null;
+  const effectiveDesc = description && description.trim() ? description.trim() : `Despesa - ${resolved.company.name}`;
 
-  // 2. Resolver Categoria e Centro de Custo
+  // 4. Resolver Categoria e Centro de Custo
   const categoryId = await resolveCategory(categoryQuery, companyId);
   const costCenterId = await resolveCostCenter(costCenterQuery, companyId);
 
-  // 3. Identifica autor da operação (usuário da API Key se fornecido)
+  // 5. Identifica autor da operação (usuário da API Key se fornecido)
   const effectiveUserId = scope && !scope.isMaster && scope.user ? scope.user.id : createdBy || null;
 
-  // 4. Tratar parcelamento se houver
+  // 6. Tratar parcelamento se houver
   const numInstallments = Math.max(1, Math.floor(installments));
   const baseAmount =
     numInstallments > 1 && installmentAmountType === "total"
@@ -153,9 +167,9 @@ export async function createTransaction(params: CreateTransactionParams, scope?:
 
   for (let i = 0; i < numInstallments; i++) {
     const currentTxId = crypto.randomUUID();
-    const currentDueDate = i === 0 ? dueDate : addMonths(dueDate, i);
+    const currentDueDate = i === 0 ? normalizedDueDate : addMonths(normalizedDueDate, i);
     const currentDesc =
-      numInstallments > 1 ? `${description} (${i + 1}/${numInstallments})` : description;
+      numInstallments > 1 ? `${effectiveDesc} (${i + 1}/${numInstallments})` : effectiveDesc;
 
     let invoiceUrl: string | null = null;
     let receiptUrl: string | null = null;
@@ -204,7 +218,7 @@ export async function createTransaction(params: CreateTransactionParams, scope?:
       bank_account_id: bankAccountId,
       category_id: categoryId,
       cost_center_id: costCenterId,
-      type,
+      type: effectiveType,
       description: currentDesc,
       amount: baseAmount,
       due_date: currentDueDate,
@@ -460,9 +474,6 @@ export async function listTransactions(filter: ListTransactionsFilter = {}, scop
       if (scope.allowedCompanyIds) {
         q = q.in("company_id", Array.from(scope.allowedCompanyIds));
       }
-      if (scope.allowedBankAccountIds) {
-        q = q.in("bank_account_id", Array.from(scope.allowedBankAccountIds));
-      }
     }
 
     if (filter.companyQuery) {
@@ -474,27 +485,32 @@ export async function listTransactions(filter: ListTransactionsFilter = {}, scop
     }
 
     if (filter.type && filter.type !== "all") {
-      q = q.eq("type", filter.type);
+      let normType = filter.type;
+      if (normType === "despesa" as any) normType = "saida";
+      if (normType === "receita" as any) normType = "entrada";
+      q = q.eq("type", normType);
     }
 
     if (filter.status && filter.status !== "all") {
-      q = q.eq("status", filter.status);
+      let normStatus = filter.status;
+      if (normStatus === "aberto" as any) normStatus = "pendente";
+      q = q.eq("status", normStatus);
     }
 
     if (filter.dueDateFrom) {
-      q = q.gte("due_date", filter.dueDateFrom);
+      q = q.gte("due_date", parseFlexibleDate(filter.dueDateFrom));
     }
 
     if (filter.dueDateTo) {
-      q = q.lte("due_date", filter.dueDateTo);
+      q = q.lte("due_date", parseFlexibleDate(filter.dueDateTo));
     }
 
     if (filter.paidDateFrom) {
-      q = q.gte("paid_date", filter.paidDateFrom);
+      q = q.gte("paid_date", parseFlexibleDate(filter.paidDateFrom));
     }
 
     if (filter.paidDateTo) {
-      q = q.lte("paid_date", filter.paidDateTo);
+      q = q.lte("paid_date", parseFlexibleDate(filter.paidDateTo));
     }
 
     if (filter.search) {
@@ -568,5 +584,50 @@ export async function listTransactions(filter: ListTransactionsFilter = {}, scop
   return {
     total: enriched.length,
     transactions: enriched,
+  };
+}
+
+export async function createBankAccount(
+  params: {
+    companyQuery: string;
+    bank: string;
+    name: string;
+    initialBalance?: number;
+  },
+  scope?: ResolvedScope
+) {
+  const resolved = await resolveAccountAndCompany({ companyQuery: params.companyQuery }, scope);
+  const companyId = resolved.company.id;
+
+  const id = crypto.randomUUID();
+  const initialBalance = Number(params.initialBalance) || 0;
+
+  const { data, error } = await supabase
+    .from("bank_accounts")
+    .insert({
+      id,
+      company_id: companyId,
+      bank: params.bank.trim(),
+      name: params.name.trim(),
+      initial_balance: initialBalance,
+      active: true,
+    })
+    .select()
+    .single();
+
+  if (error) throw new Error(`Erro ao cadastrar conta bancária: ${error.message}`);
+
+  return {
+    success: true,
+    message: `Conta bancária "${params.name}" (${params.bank}) cadastrada com sucesso para ${resolved.company.name}.`,
+    account: {
+      id: data.id,
+      companyId: data.company_id,
+      companyName: resolved.company.name,
+      bank: data.bank,
+      name: data.name,
+      initialBalance: data.initial_balance,
+      initialBalanceFormatted: formatBRL(data.initial_balance),
+    },
   };
 }
