@@ -14,6 +14,7 @@ import {
   KeyRound,
   Settings,
   ChevronsUpDown,
+  Bot,
 } from "lucide-react";
 import {
   Sidebar,
@@ -48,6 +49,7 @@ const cadastros = [
   { title: "Contas bancárias", url: "/contas", icon: Landmark },
   { title: "Categorias", url: "/categorias", icon: Tags },
   { title: "Centros de custo", url: "/centros-custo", icon: FolderTree },
+  { title: "Chaves MCP (IA)", url: "/mcp", icon: Bot },
   { title: "Ajustes do Sistema", url: "/configuracoes", icon: Settings },
 ];
 

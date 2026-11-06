@@ -1,0 +1,25 @@
+{
+  "name": "financegest-mcp-server",
+  "version": "1.0.0",
+  "description": "MCP Server completo para gestão financeira do FinanceGest (Multiempresa, Multicontas, Baixas, Anexos e Conciliação)",
+  "main": "dist/index.js",
+  "type": "module",
+  "bin": {
+    "financegest-mcp": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "bun run src/index.ts"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.6.0",
+    "@supabase/supabase-js": "^2.49.1",
+    "dotenv": "^16.4.7",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.0",
+    "typescript": "^5.8.0"
+  }
+}

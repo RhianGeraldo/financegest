@@ -15,7 +15,8 @@ import {
   LogOut,
   ChevronRight,
   UserCircle,
-  KeyRound
+  KeyRound,
+  Bot
 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/configuracoes")({
@@ -37,6 +38,7 @@ function ConfiguracoesPage() {
     { title: "Contas bancárias", url: "/contas", icon: Landmark, color: "text-blue-500", bg: "bg-blue-500/10" },
     { title: "Categorias", url: "/categorias", icon: Tags, color: "text-amber-500", bg: "bg-amber-500/10" },
     { title: "Centros de custo", url: "/centros-custo", icon: Building, color: "text-emerald-500", bg: "bg-emerald-500/10" },
+    { title: "Agentes & Chaves MCP", url: "/mcp", icon: Bot, color: "text-indigo-500", bg: "bg-indigo-500/10" },
   ];
 
   const adminMenu = [
